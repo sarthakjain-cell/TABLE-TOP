@@ -1,0 +1,18 @@
+{
+  "name": "tabletop-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@prisma/client": "^5.14.0",
+    "prisma": "^5.14.0",
+    "typescript": "^5.4.5"
+  }
+}

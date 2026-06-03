@@ -1,0 +1,138 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OperationalMode {
+  FULL_SERVICE
+  SELF_SERVICE
+}
+
+enum TableStatus {
+  VACANT
+  OCCUPIED
+}
+
+enum SessionStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum OrderStatus {
+  PENDING      // Collaborative active cart status
+  NEW          // Submitted to kitchen
+  PREPARING
+  READY_TO_SERVE
+  COMPLETED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  VOIDED
+}
+
+model Restaurant {
+  id              String          @id @default(uuid())
+  name            String
+  operationalMode OperationalMode @default(FULL_SERVICE)
+  taxRate         Decimal         @db.Decimal(5, 4) // e.g. 0.0825 for 8.25%
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  tables          Table[]
+  menuItems       MenuItem[]
+}
+
+model Table {
+  id           String      @id @default(uuid())
+  number       String
+  token        String      @unique // Secure signed token containing table details
+  status       TableStatus @default(VACANT)
+  restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  sessions     Session[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([restaurantId, number])
+}
+
+model Session {
+  id           String        @id @default(uuid())
+  tableId      String
+  table        Table         @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  restaurantId String
+  status       SessionStatus @default(ACTIVE)
+  orders       Order[]
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  closedAt     DateTime?
+}
+
+model MenuItem {
+  id           String      @id @default(uuid())
+  name         String
+  description  String?
+  price        Decimal     @db.Decimal(10, 2)
+  imageUrl     String?     // Cloudinary URL for the dish photo
+  isAvailable  Boolean     @default(true)
+  restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  sessionId String
+  session   Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id            String             @id @default(uuid())
+  orderId       String
+  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId    String
+  menuItem      MenuItem           @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  quantity      Decimal            @db.Decimal(10, 2) // Enabled fractional quantities (e.g. 1.5 or 0.5)
+  price         Decimal            @db.Decimal(10, 2) // Captured price at checkout/order time to avoid menu updates affecting past orders
+  modifications String[]           // Array of user requests like "No onions", "Extra cheese"
+  payments      OrderItemPayment[]
+  createdAt     DateTime           @default(now())
+}
+
+model Transaction {
+  id            String             @id @default(uuid())
+  sessionId     String
+  session       Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  amount        Decimal            @db.Decimal(10, 2)
+  taxPaid       Decimal            @db.Decimal(10, 2)
+  status        TransactionStatus  @default(PENDING)
+  customerName  String?            // Metadata tracking for split billing
+  customerPhone String?            // Metadata tracking for split billing
+  paymentItems  OrderItemPayment[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model OrderItemPayment {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  orderItemId   String
+  orderItem     OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  quantityPaid  Decimal     @db.Decimal(10, 2) // Quantity of this OrderItem paid in this transaction (allows decimal splits)
+  amount        Decimal     @db.Decimal(10, 2) // Calculated subtotal for this portion
+  taxFraction   Decimal     @db.Decimal(10, 4) // Exact tax portion attributed to this split item
+  createdAt     DateTime    @default(now())
+}
