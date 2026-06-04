@@ -161,12 +161,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     socketInstance.on('menuItemAvailabilityChanged', ({ menuItemId, isAvailable }) => {
       console.log(`Menu Item ${menuItemId} availability changed:`, isAvailable);
+      window.dispatchEvent(new CustomEvent('menu-updated'));
       // Fetches updated state if item availability shifts
       if (sessionParams.current) {
         socketInstance.emit('joinSession', sessionParams.current, (res: any) => {
           if (res?.success) setTableSession(res.state);
         });
       }
+    });
+
+    socketInstance.on('menuUpdated', () => {
+      console.log('Menu catalog updated, forcing refresh');
+      window.dispatchEvent(new CustomEvent('menu-updated'));
     });
 
     socketInstance.on('operationalModeChanged', ({ mode }) => {
@@ -194,6 +200,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       socketInstance.off('orderStatusUpdated');
       socketInstance.off('pickupReady');
       socketInstance.off('menuItemAvailabilityChanged');
+      socketInstance.off('menuUpdated');
       socketInstance.off('operationalModeChanged');
       socketInstance.off('error');
       socketInstance.close();

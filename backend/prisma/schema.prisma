@@ -79,6 +79,7 @@ model MenuItem {
   name         String
   description  String?
   price        Decimal     @db.Decimal(10, 2)
+  category     String      @default("Main Course")
   imageUrl     String?     // Cloudinary URL for the dish photo
   isAvailable  Boolean     @default(true)
   restaurantId String

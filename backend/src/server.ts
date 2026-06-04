@@ -14,6 +14,7 @@ import uploadRoutes from './routes/upload';
 import fastifyMultipart from '@fastify/multipart';
 
 const fastify = Fastify({
+  maxParamLength: 1000,
   logger: {
     level: 'info',
     transport: {

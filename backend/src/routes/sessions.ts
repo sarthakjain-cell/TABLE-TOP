@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '../prisma';
+import { getIO } from '../socket';
 
 export const sessionRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Get details of a specific session (includes orders, order items, and transactions)
@@ -65,9 +66,19 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
 
       // Vacate the associated table
-      await prisma.table.update({
+      const updatedTable = await prisma.table.update({
         where: { id: session.tableId },
         data: { status: 'VACANT' },
+      });
+
+      const io = getIO();
+      io.emit('helpRequested', {
+        tableNumber: updatedTable.number,
+        requestType: 'CHECKOUT_COMPLETE'
+      });
+      io.to(`session:${id}`).emit('orderStatusUpdated', {
+        orderId: 'SESSION_COMPLETE',
+        status: 'COMPLETED'
       });
 
       return updatedSession;

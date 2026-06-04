@@ -69,44 +69,71 @@ export default function KitchenPage() {
   };
 
   useEffect(() => {
-    let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
-    if (storedRestId.startsWith('eyJ')) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('tabletop_restaurant_id');
-        window.location.reload();
+    const initData = async () => {
+      let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
+      
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedRestId);
+      if (storedRestId && !isUUID) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('tabletop_restaurant_id');
+        }
+        storedRestId = '';
       }
-      storedRestId = '';
-    }
-    setRestaurantId(storedRestId);
-
-    if (storedRestId) {
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-      fetch(`/api/restaurants/${storedRestId}`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) setErrorMessage(data.error);
-          else setOperationalMode(data.operationalMode);
-        })
-        .catch(console.error);
-
-      fetch(`/api/orders/active?restaurantId=${storedRestId}`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setTickets(data.filter((t: KitchenTicket) => t.status !== 'COMPLETED'));
+      
+      if (!storedRestId && authToken) {
+        try {
+          const res = await fetch('/api/restaurants');
+          const data = await res.json();
+          if (data && data.length > 0) {
+            storedRestId = data[0].id;
+            localStorage.setItem('tabletop_restaurant_id', storedRestId);
           }
-        })
-        .catch(console.error);
+        } catch (e) {
+          console.error('Failed to auto-fetch default restaurant', e);
+        }
+      }
+      
+      setRestaurantId(storedRestId);
 
-      fetch(`/api/menu?restaurantId=${storedRestId}`, { headers })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setMenuItems(data);
-        })
-        .catch(console.error);
-    }
+      if (storedRestId) {
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+        fetch(`/api/restaurants/${storedRestId}`, { headers })
+          .then(res => res.json())
+          .then(async data => {
+            if (data.error) {
+               setErrorMessage(data.error);
+               const r = await fetch('/api/restaurants');
+               const d = await r.json();
+               if (d && d.length > 0) {
+                  const newId = d[0].id;
+                  localStorage.setItem('tabletop_restaurant_id', newId);
+                  window.location.reload();
+               }
+            }
+            else setOperationalMode(data.operationalMode);
+          })
+          .catch(console.error);
+
+        fetch(`/api/orders/active?restaurantId=${storedRestId}`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) {
+              setTickets(data.filter((t: KitchenTicket) => t.status !== 'COMPLETED'));
+            }
+          })
+          .catch(console.error);
+
+        fetch(`/api/menu?restaurantId=${storedRestId}`, { headers })
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setMenuItems(data);
+          })
+          .catch(console.error);
+      }
+    };
+    initData();
   }, [authToken]);
 
   useEffect(() => {
@@ -174,8 +201,11 @@ export default function KitchenPage() {
   };
 
   const toggleDishAvailability = async (id: string, currentStatus: boolean) => {
+    // Optimistic UI Update - instantly reflect change
+    setMenuItems(prev => prev.map(m => m.id === id ? { ...m, isAvailable: !currentStatus } : m));
+
     try {
-      const res = await fetch(`/api/menu/${id}`, {
+      const res = await fetch(`/api/menu/${id}/availability`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
@@ -183,11 +213,13 @@ export default function KitchenPage() {
         },
         body: JSON.stringify({ isAvailable: !currentStatus })
       });
-      if (res.ok) {
-        setMenuItems(prev => prev.map(m => m.id === id ? { ...m, isAvailable: !currentStatus } : m));
+      if (!res.ok) {
+        throw new Error('Failed to update dish availability');
       }
     } catch (err) {
       console.error(err);
+      // Revert on failure
+      setMenuItems(prev => prev.map(m => m.id === id ? { ...m, isAvailable: currentStatus } : m));
     }
   };
 
@@ -351,28 +383,34 @@ export default function KitchenPage() {
 
                     {/* Ticket Footer Action */}
                     <div className="p-3 bg-gray-900 border-t-4 border-gray-700">
-                      {operationalMode === 'FULL_SERVICE' ? (
-                        isNew ? (
-                          <button 
-                            onClick={() => updateOrderStatus(ticket.id, 'PREPARING')}
-                            className="w-full bg-gray-700 hover:bg-gray-600 text-white font-black text-2xl py-6 rounded-xl active:scale-95 transition-transform"
-                          >
-                            MARK PREPARING
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => updateOrderStatus(ticket.id, 'READY_TO_SERVE')}
-                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl py-6 rounded-xl active:scale-95 transition-transform shadow-lg shadow-emerald-900"
-                          >
-                            READY FOR SERVICE
-                          </button>
-                        )
-                      ) : (
+                      {ticket.status === 'NEW' && (
                         <button 
-                           onClick={() => updateOrderStatus(ticket.id, 'READY_TO_SERVE')}
-                           className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black text-2xl py-6 rounded-xl active:scale-95 transition-transform shadow-lg shadow-amber-900 flex items-center justify-center gap-3"
+                          onClick={() => updateOrderStatus(ticket.id, 'PREPARING')}
+                          className="w-full bg-gray-700 hover:bg-gray-600 text-white font-black text-2xl py-6 rounded-xl active:scale-95 transition-transform"
                         >
-                           <Bell size={28} /> SIGNAL COLLECTION
+                          MARK PREPARING
+                        </button>
+                      )}
+
+                      {ticket.status === 'PREPARING' && (
+                        <button 
+                          onClick={() => updateOrderStatus(ticket.id, 'READY_TO_SERVE')}
+                          className={`w-full text-white font-black text-2xl py-6 rounded-xl active:scale-95 transition-transform shadow-lg flex items-center justify-center gap-3 ${
+                            operationalMode === 'FULL_SERVICE' 
+                              ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900' 
+                              : 'bg-amber-600 hover:bg-amber-500 shadow-amber-900'
+                          }`}
+                        >
+                          {operationalMode === 'FULL_SERVICE' ? 'READY FOR SERVICE' : <><Bell size={28} /> SIGNAL COLLECTION</>}
+                        </button>
+                      )}
+
+                      {ticket.status === 'READY_TO_SERVE' && (
+                        <button 
+                          onClick={() => updateOrderStatus(ticket.id, 'COMPLETED')}
+                          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black text-2xl py-6 rounded-xl active:scale-95 transition-transform shadow-lg shadow-blue-900 flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle size={28} /> CLEAR TICKET
                         </button>
                       )}
                     </div>

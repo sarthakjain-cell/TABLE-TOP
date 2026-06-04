@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { decimalMath } from '../../utils/decimalMath';
 import { QRCodeSVG } from 'qrcode.react';
-import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X } from 'lucide-react';
 
 interface OrderItem {
   id?: string;
@@ -40,7 +41,9 @@ interface MenuItem {
   name: string;
   description: string | null;
   price: string;
+  category?: string;
   isAvailable: boolean;
+  imageUrl?: string;
 }
 
 interface Transaction {
@@ -54,6 +57,7 @@ interface Transaction {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const { isConnected, socket, authToken, setAuthToken } = useSocket();
   const [restaurantId, setRestaurantId] = useState<string>('');
   const [restaurantName, setRestaurantName] = useState<string>('Table Top SaaS');
@@ -72,8 +76,23 @@ export default function AdminPage() {
   const [newDishName, setNewDishName] = useState('');
   const [newDishPrice, setNewDishPrice] = useState('');
   const [newDishDesc, setNewDishDesc] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [newDishCategory, setNewDishCategory] = useState('');
+  const [newDishImageUrl, setNewDishImageUrl] = useState('');
+  const [isSavingDish, setIsSavingDish] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Menu Item Editing states
+  const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
+  const [editDishName, setEditDishName] = useState('');
+  const [editDishPrice, setEditDishPrice] = useState('');
+  const [editDishDesc, setEditDishDesc] = useState('');
+  const [editDishCategory, setEditDishCategory] = useState('');
+  const [editDishImageUrl, setEditDishImageUrl] = useState('');
+  const [isUpdatingDish, setIsUpdatingDish] = useState(false);
+  const [isDeletingDish, setIsDeletingDish] = useState(false);
+  const editFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // QR Code Modal State
   const [qrModalTable, setQrModalTable] = useState<Table | null>(null);
@@ -128,7 +147,30 @@ export default function AdminPage() {
       setIsAddingTable(false);
     }
   };
-
+  const handleForceCloseSession = async (sessionId: string, tableId: string) => {
+    if (!confirm('Are you sure you want to mark this table as paid manually? This will clear the table, and the money will NOT be recorded in the digital ledger.')) return;
+    
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/close`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (!res.ok) {
+         const data = await res.json();
+         throw new Error(data.error);
+      }
+      
+      // Optimistically update the UI to vacate the table
+      setTables(prev => prev.map(t => {
+        if (t.id === tableId) {
+          return { ...t, status: 'VACANT', activeSession: undefined };
+        }
+        return t;
+      }));
+    } catch (err: any) {
+      alert(`Failed to manually close session: ${err.message}`);
+    }
+  };
   const deleteTable = async (tableId: string) => {
     if (!confirm('Are you sure you want to delete this table? This will permanently remove its QR code and history.')) return;
     try {
@@ -176,10 +218,31 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    const storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
-    setRestaurantId(storedRestId);
+    const initData = async () => {
+      let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
+      
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedRestId);
+      if (storedRestId && !isUUID) {
+         storedRestId = '';
+         if (typeof window !== 'undefined') localStorage.removeItem('tabletop_restaurant_id');
+      }
 
-    if (storedRestId && authToken) {
+      if (!storedRestId && authToken) {
+        try {
+          const res = await fetch('/api/restaurants');
+          const data = await res.json();
+          if (data && data.length > 0) {
+            storedRestId = data[0].id;
+            localStorage.setItem('tabletop_restaurant_id', storedRestId);
+          }
+        } catch (e) {
+          console.error('Failed to auto-fetch default restaurant', e);
+        }
+      }
+      
+      setRestaurantId(storedRestId);
+
+      if (storedRestId && authToken) {
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
@@ -187,7 +250,7 @@ export default function AdminPage() {
 
       fetch(`/api/restaurants/${storedRestId}`, { headers })
         .then(res => res.json())
-        .then(data => {
+        .then(async data => {
           if (!data.error) {
             setRestaurantName(data.name);
             setOperationalMode(data.operationalMode);
@@ -196,6 +259,14 @@ export default function AdminPage() {
               const sorted = data.tables.sort((a: Table, b: Table) => Number(a.number) - Number(b.number));
               setTables(sorted);
             }
+          } else {
+             const r = await fetch('/api/restaurants');
+             const d = await r.json();
+             if (d && d.length > 0) {
+                const newId = d[0].id;
+                localStorage.setItem('tabletop_restaurant_id', newId);
+                window.location.reload();
+             }
           }
         })
         .catch(err => console.error('Error fetching admin restaurant configs', err));
@@ -213,7 +284,9 @@ export default function AdminPage() {
           if (Array.isArray(data)) setTransactions(data);
         })
         .catch(err => console.error('Error fetching admin transactions', err));
-    }
+      }
+    };
+    initData();
   }, [authToken]);
 
   useEffect(() => {
@@ -222,9 +295,19 @@ export default function AdminPage() {
       // Mock logic to refresh on socket events
       // In reality, this would dispatch to update individual table states
     };
+    
+    const handleHelpRequested = ({ tableNumber, requestType }: { tableNumber: string, requestType: string }) => {
+      // Note: backend emits the table's ID as tableNumber here
+      setTables(prev => prev.map(t => t.id === tableNumber ? { ...t, waiterRequested: true } : t));
+      const audio = new Audio('/assets/audio/chime.mp3');
+      audio.play().catch(err => console.log('Audio blocked', err));
+    };
+
     socket.on('adminStateSynced', handleAdminSync);
+    socket.on('helpRequested', handleHelpRequested);
     return () => {
       socket.off('adminStateSynced', handleAdminSync);
+      socket.off('helpRequested', handleHelpRequested);
     };
   }, [socket, isConnected]);
 
@@ -268,35 +351,92 @@ export default function AdminPage() {
     };
   }, [socket, isConnected, restaurantId]);
 
+  const uploadToCloudinary = async (file: File, isEdit: boolean = false) => {
+    setIsUploadingImage(true);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (isEdit) {
+        setEditDishImageUrl(data.url);
+      } else {
+        setNewDishImageUrl(data.url);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadToCloudinary(file, isEdit);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, isEdit: boolean = false) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      uploadToCloudinary(file, isEdit);
+    }
+  };
+
+  const handleRemoveImage = async (isEdit: boolean = false) => {
+    if (isEdit) {
+      setEditDishImageUrl('');
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+
+      // Optimistic UI for image removal on existing dish
+      if (editingDish) {
+        setMenuItems(prev => prev.map(m => m.id === editingDish.id ? { ...m, imageUrl: '' } : m));
+        try {
+          const res = await fetch(`/api/menu/${editingDish.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ imageUrl: null })
+          });
+          if (res.ok) router.refresh();
+        } catch (err) {
+          console.error('Failed to remove image in backend', err);
+        }
+      }
+    } else {
+      setNewDishImageUrl('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleAddDish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDishName || !newDishPrice) return;
     
-    setIsUploading(true);
+    setIsSavingDish(true);
     try {
-      let uploadedImageUrl = undefined;
-
-      // 1. Upload image if one was selected
-      if (imageFile) {
-        const formData = new FormData();
-        formData.append('file', imageFile);
-
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${authToken}` },
-          body: formData
-        });
-        
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          uploadedImageUrl = uploadData.url;
-        } else {
-          console.error('Image upload failed');
-          alert('Failed to upload image. Dish will be saved without it.');
-        }
-      }
-
-      // 2. Save the dish to the database
       const res = await fetch('/api/menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
@@ -305,7 +445,8 @@ export default function AdminPage() {
           name: newDishName, 
           price: Number(newDishPrice), 
           description: newDishDesc,
-          imageUrl: uploadedImageUrl
+          category: newDishCategory || "Main Course",
+          imageUrl: newDishImageUrl || undefined
         })
       });
       
@@ -313,31 +454,104 @@ export default function AdminPage() {
         setNewDishName('');
         setNewDishPrice('');
         setNewDishDesc('');
-        setImageFile(null);
-        // refresh will be handled by socket or manual pull, but let's fetch here for instant update
+        setNewDishCategory('');
+        setNewDishImageUrl('');
         fetch(`/api/menu?restaurantId=${restaurantId}`)
           .then(r => r.json())
           .then(data => { if (!data.error) setMenuItems(data); });
+        router.refresh();
       }
     } catch (err) {
       console.error('Failed to add dish', err);
     } finally {
-      setIsUploading(false);
+      setIsSavingDish(false);
     }
   };
 
-  const toggleDishAvailability = async (id: string, currentStatus: boolean) => {
+  const handleUpdateDish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDish || !editDishName || !editDishPrice) return;
+    
+    setIsUpdatingDish(true);
+    try {
+      const res = await fetch(`/api/menu/${editingDish.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ 
+          name: editDishName, 
+          price: Number(editDishPrice), 
+          description: editDishDesc,
+          category: editDishCategory || "Main Course",
+          imageUrl: editDishImageUrl || undefined
+        })
+      });
+      
+      if (res.ok) {
+        setEditingDish(null);
+        fetch(`/api/menu?restaurantId=${restaurantId}`)
+          .then(r => r.json())
+          .then(data => { if (!data.error) setMenuItems(data); });
+        router.refresh();
+      }
+    } catch (err) {
+      console.error('Failed to update dish', err);
+    } finally {
+      setIsUpdatingDish(false);
+    }
+  };
+
+  const handleDeleteDish = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this dish?')) return;
+    setIsDeletingDish(true);
     try {
       const res = await fetch(`/api/menu/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        setEditingDish(null);
+        fetch(`/api/menu?restaurantId=${restaurantId}`)
+          .then(r => r.json())
+          .then(data => { if (!data.error) setMenuItems(data); });
+        router.refresh();
+      } else {
+        const errorData = await res.json();
+        alert(`Could not delete: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to delete dish', err);
+      alert('An error occurred while deleting the dish.');
+    } finally {
+      setIsDeletingDish(false);
+    }
+  };
+
+  const openEditModal = (item: MenuItem) => {
+    setEditingDish(item);
+    setEditDishName(item.name);
+    setEditDishPrice(item.price);
+    setEditDishDesc(item.description || '');
+    setEditDishCategory(item.category || 'Main Course');
+    setEditDishImageUrl(item.imageUrl || '');
+  };
+
+  const toggleDishAvailability = async (id: string, currentStatus: boolean) => {
+    // Optimistic UI Update - instantly reflect change
+    setMenuItems(prev => prev.map(m => m.id === id ? { ...m, isAvailable: !currentStatus } : m));
+
+    try {
+      const res = await fetch(`/api/menu/${id}/availability`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ isAvailable: !currentStatus })
       });
-      if (res.ok) {
-        setMenuItems(prev => prev.map(m => m.id === id ? { ...m, isAvailable: !currentStatus } : m));
+      if (!res.ok) {
+        throw new Error('Failed to update dish availability');
       }
     } catch (err) {
       console.error(err);
+      // Revert on failure
+      setMenuItems(prev => prev.map(m => m.id === id ? { ...m, isAvailable: currentStatus } : m));
     }
   };
 
@@ -455,22 +669,13 @@ export default function AdminPage() {
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-gray-800 tracking-tight">{restaurantName}</h2>
             <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
-            <div 
-               className="hidden sm:flex items-center gap-2 cursor-pointer select-none"
+            <button 
+               className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
                onClick={toggleMode}
             >
-              <span className={`text-xs font-semibold ${operationalMode === 'FULL_SERVICE' ? 'text-blue-600' : 'text-gray-400'}`}>FULL SERVICE</span>
-              <button
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 pointer-events-none ${
-                  operationalMode === 'FULL_SERVICE' ? 'bg-blue-600' : 'bg-amber-500'
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  operationalMode === 'FULL_SERVICE' ? 'translate-x-1' : 'translate-x-6'
-                }`} />
-              </button>
-              <span className={`text-xs font-semibold ${operationalMode === 'SELF_SERVICE' ? 'text-amber-600' : 'text-gray-400'}`}>SELF SERVICE</span>
-            </div>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'FULL_SERVICE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Waitstaff</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'SELF_SERVICE' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Self-Serve</span>
+            </button>
           </div>
           
           <div className="flex items-center gap-6">
@@ -563,9 +768,12 @@ export default function AdminPage() {
                     >
                       {/* Waiter Badge (Micro-interaction) */}
                       {isWaiterRequested && (
-                        <div className="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1 z-10 animate-bounce">
-                          <Bell size={12} /> Waiter
-                        </div>
+                        <button 
+                          onClick={() => setTables(prev => prev.map(t => t.id === table.id ? { ...t, waiterRequested: false } : t))}
+                          className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1 z-10 animate-bounce cursor-pointer active:scale-95 transition-transform"
+                        >
+                          <Bell size={12} /> Clear Waiter
+                        </button>
                       )}
 
                       <div className="flex justify-between items-start mb-4">
@@ -608,6 +816,14 @@ export default function AdminPage() {
                               <span className="text-xs text-gray-500 font-medium">Time: <span className="text-gray-900">{mockElapsed}</span></span>
                               <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">${mockTotal}</span>
                             </div>
+                            {table.activeSession && (
+                              <button
+                                onClick={() => handleForceCloseSession(table.activeSession!.id, table.id)}
+                                className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors border border-red-200"
+                              >
+                                Bill Paid Manually / Vacate
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -672,7 +888,13 @@ export default function AdminPage() {
                               {item.isAvailable ? 'Available' : 'Sold Out'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="text-xs font-semibold px-3 py-1.5 rounded transition-colors text-blue-600 hover:bg-blue-50"
+                            >
+                              Edit
+                            </button>
                             <button
                               onClick={() => toggleDishAvailability(item.id, item.isAvailable)}
                               className={`text-xs font-semibold px-3 py-1.5 rounded transition-colors ${
@@ -703,33 +925,95 @@ export default function AdminPage() {
                         className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                       />
                     </div>
-                    <textarea
-                      placeholder="Description"
-                      value={newDishDesc} onChange={(e) => setNewDishDesc(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      rows={2}
-                    />
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Dish Photo (Optional)</label>
+                    <div className="grid grid-cols-2 gap-4">
                       <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            setImageFile(e.target.files[0]);
-                          }
-                        }}
-                        className="block w-full text-sm text-gray-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-blue-50 file:text-blue-700
-                          hover:file:bg-blue-100
-                        "
+                        type="text" list="categories" placeholder="Category (e.g. Breads)" required
+                        value={newDishCategory} onChange={(e) => setNewDishCategory(e.target.value)}
+                        className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                      <textarea
+                        placeholder="Description"
+                        value={newDishDesc} onChange={(e) => setNewDishDesc(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        rows={1}
                       />
                     </div>
-                    <button type="submit" disabled={isUploading} className={`font-semibold py-2 px-4 rounded-lg text-sm transition ${isUploading ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
-                      {isUploading ? 'Saving...' : 'Save Dish'}
+                    <datalist id="categories">
+                      <option value="Breakfast" />
+                      <option value="Snacks" />
+                      <option value="Main Course" />
+                      <option value="Dinner" />
+                      <option value="Breads" />
+                      <option value="Desserts" />
+                      <option value="Beverages" />
+                    </datalist>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Dish Photo (Optional)</label>
+                      {newDishImageUrl ? (
+                        <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={newDishImageUrl} 
+                            alt="Dish preview" 
+                            className="w-full h-48 object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-sm hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
+                            aria-label="Remove image"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div 
+                          className={`
+                            relative flex flex-col items-center justify-center p-6 
+                            border-2 border-dashed rounded-lg transition-colors cursor-pointer
+                            ${isUploadingImage 
+                              ? 'border-blue-400 bg-blue-50' 
+                              : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 bg-gray-50'
+                            }
+                          `}
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          onClick={() => !isUploadingImage && fileInputRef.current?.click()}
+                        >
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => handleImageUpload(e, false)}
+                            disabled={isUploadingImage}
+                          />
+                          
+                          {isUploadingImage ? (
+                            <>
+                              <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                              <span className="text-sm text-blue-600 font-medium">Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="w-8 h-8 text-gray-400 mb-2" />
+                              <span className="text-sm text-gray-600 text-center">
+                                Click or drag image to upload
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {uploadError && (
+                        <p className="text-sm text-red-500 mt-1">{uploadError}</p>
+                      )}
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={isSavingDish || isUploadingImage} 
+                      className={`font-semibold py-2 px-4 rounded-lg text-sm transition ${isSavingDish || isUploadingImage ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                    >
+                      {isUploadingImage ? 'Uploading Image...' : isSavingDish ? 'Saving...' : 'Save Dish'}
                     </button>
                   </form>
                 </div>
@@ -873,48 +1157,148 @@ export default function AdminPage() {
               <p className="text-lg font-black text-gray-900 tracking-tight" style={{ color: qrFgColor }}>
                 Table {qrModalTable.number}
               </p>
-            </div>
 
-            <div className="px-6 pb-6 bg-white border-t border-gray-100 pt-6">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Code Color</label>
-                  <input 
-                    type="color" 
-                    value={qrFgColor} 
-                    onChange={e => setQrFgColor(e.target.value)}
-                    className="w-full h-8 rounded border-none cursor-pointer"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Background</label>
-                  <input 
-                    type="color" 
-                    value={qrBgColor} 
-                    onChange={e => setQrBgColor(e.target.value)}
-                    className="w-full h-8 rounded border-none cursor-pointer"
-                  />
-                </div>
+              <div className="p-6 space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="text-xs font-semibold text-gray-600 block mb-1">Theme Color</label>
+                     <input 
+                       type="color" 
+                       value={qrFgColor} 
+                       onChange={e => setQrFgColor(e.target.value)}
+                       className="w-full h-8 rounded cursor-pointer border border-gray-200"
+                     />
+                   </div>
+                   <div>
+                     <label className="text-xs font-semibold text-gray-600 block mb-1">Background</label>
+                     <input 
+                       type="color" 
+                       value={qrBgColor} 
+                       onChange={e => setQrBgColor(e.target.value)}
+                       className="w-full h-8 rounded cursor-pointer border border-gray-200"
+                     />
+                   </div>
+                 </div>
+
+                 <div className="flex gap-3 pt-2">
+                   <button
+                     onClick={() => setQrModalTable(null)}
+                     className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+                   >
+                     Close
+                   </button>
+                   <button
+                     onClick={downloadQR}
+                     className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                   >
+                     <Download size={16} /> Save SVG
+                   </button>
+                 </div>
               </div>
-            </div>
-
-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex gap-3">
-              <button
-                onClick={() => setQrModalTable(null)}
-                className="flex-1 py-2.5 rounded-lg font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm text-sm"
-              >
-                Close
-              </button>
-              <button
-                onClick={downloadQR}
-                className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm flex justify-center items-center gap-2 text-sm"
-              >
-                <Download size={16} /> Download
-              </button>
             </div>
           </div>
         </div>
       )}
+
+        {/* Edit Dish Modal */}
+        {editingDish && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-scale-up">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-gray-900 tracking-tight">Edit Dish</h3>
+                <button onClick={() => setEditingDish(null)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6">
+                <form onSubmit={handleUpdateDish} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text" placeholder="Dish Name" required
+                      value={editDishName} onChange={(e) => setEditDishName(e.target.value)}
+                      className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                    <input
+                      type="number" step="0.01" placeholder="Price (e.g. 12.99)" required
+                      value={editDishPrice} onChange={(e) => setEditDishPrice(e.target.value)}
+                      className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text" list="categories" placeholder="Category (e.g. Breads)" required
+                      value={editDishCategory} onChange={(e) => setEditDishCategory(e.target.value)}
+                      className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                    <textarea
+                      placeholder="Description"
+                      value={editDishDesc} onChange={(e) => setEditDishDesc(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      rows={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Dish Photo</label>
+                    {editDishImageUrl ? (
+                      <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                        <img 
+                          src={editDishImageUrl} 
+                          alt="Dish preview" 
+                          className="w-full h-48 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(true)}
+                          className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-sm hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div 
+                        className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors cursor-pointer ${isUploadingImage ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 bg-gray-50'}`}
+                        onDragOver={(e) => handleDragOver(e)}
+                        onDrop={(e) => handleDrop(e, true)}
+                        onClick={() => !isUploadingImage && editFileInputRef.current?.click()}
+                      >
+                        <input
+                          type="file"
+                          ref={editFileInputRef}
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, true)}
+                          disabled={isUploadingImage}
+                        />
+                        {isUploadingImage ? (
+                          <><Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" /><span className="text-sm text-blue-600 font-medium">Uploading...</span></>
+                        ) : (
+                          <><UploadCloud className="w-8 h-8 text-gray-400 mb-2" /><span className="text-sm text-gray-600 text-center">Click or drag image to upload</span></>
+                        )}
+                      </div>
+                    )}
+                    {uploadError && <p className="text-sm text-red-500 mt-1">{uploadError}</p>}
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => editingDish && handleDeleteDish(editingDish.id)}
+                      disabled={isDeletingDish}
+                      className="px-4 py-2 rounded-lg text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1 border border-red-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button type="button" onClick={() => setEditingDish(null)} className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" disabled={isUpdatingDish || isUploadingImage || isDeletingDish} className={`flex-1 font-semibold py-2 rounded-lg text-sm transition ${isUpdatingDish || isUploadingImage || isDeletingDish ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                      {isUploadingImage ? 'Uploading...' : isUpdatingDish ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

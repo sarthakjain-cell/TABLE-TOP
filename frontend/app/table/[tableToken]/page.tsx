@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
 
@@ -10,6 +10,7 @@ interface MenuItem {
   description: string | null;
   price: string;
   isAvailable: boolean;
+  imageUrl?: string;
 }
 
 export default function CustomerPage({ params }: { params: { tableToken: string } }) {
@@ -31,13 +32,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [showBellModal, setShowBellModal] = useState(false);
   const [showPickupAlert, setShowPickupAlert] = useState(false);
   
-  // Split billing selection state
-  // Map of orderItemId -> quantitySelectedToPay
-  const [splitSelection, setSplitSelection] = useState<Map<string, number>>(new Map());
+  // Splitwise style contributors state
+  const [contributors, setContributors] = useState([{ id: Date.now(), name: "Payer 1", amount: "" }]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const imageCacheBuster = useRef(Date.now());
+  const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category || 'Main Course')))];
 
   // 1. Verify token & join table room on mount
   useEffect(() => {
@@ -52,12 +55,17 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           setRestaurant(data.restaurant);
           joinTableSession(data.tableId, data.session.id);
           
-          // Fetch menu items
-          return fetch(`/api/menu?restaurantId=${data.restaurant.id}`);
+          // Fetch menu items securely via the new table token endpoint
+          // This endpoint was specifically built for the customer portal to only return available items
+          return fetch(`/api/table/${tableToken}/menu`);
         })
-        .then((res) => res?.json())
+        .then((res) => res.json())
         .then((items) => {
-          if (items) setMenuItems(items);
+          if (Array.isArray(items)) {
+            setMenuItems(items);
+          } else if (items?.error) {
+            setError(items.error);
+          }
         })
         .catch((err) => {
           setError(err.message || 'Failed to sync with table session');
@@ -77,8 +85,24 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       // Listen for socket events
       window.addEventListener('pickup-ready', handlePickupAlert);
     }
+    
+    const handleMenuUpdate = () => {
+      fetch(`/api/table/${tableToken}/menu`)
+        .then((res) => res?.json())
+        .then((items) => {
+          if (items && !items.error) {
+            imageCacheBuster.current = Date.now();
+            setMenuItems(items);
+          }
+        })
+        .catch((err) => console.error('Silent menu update failed', err));
+    };
+
+    window.addEventListener('menu-updated', handleMenuUpdate);
+
     return () => {
       window.removeEventListener('pickup-ready', handlePickupAlert);
+      window.removeEventListener('menu-updated', handleMenuUpdate);
     };
   }, [tableSession]);
 
@@ -111,46 +135,25 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     );
   }
 
-  const handleSplitQtyChange = (orderItemId: string, amount: number, maxQty: number) => {
-    const nextMap = new Map(splitSelection);
-    const current = nextMap.get(orderItemId) || 0;
-    const nextQty = Math.max(0, Math.min(maxQty, Number((current + amount).toFixed(2))));
-    
-    if (nextQty === 0) {
-      nextMap.delete(orderItemId);
-    } else {
-      nextMap.set(orderItemId, nextQty);
-    }
-    setSplitSelection(nextMap);
+  const getFullUnpaidItemsPayload = () => {
+    const items: any[] = [];
+    tableSession?.orders?.flatMap((o: any) => o.items).forEach((item: any) => {
+      if (item.unpaidQuantity > 0) {
+        items.push({ orderItemId: item.orderItemId, quantityToPay: item.unpaidQuantity });
+      }
+    });
+    return items;
   };
 
-  // Perform split checkout calculation using high precision client-side decimal math
-  let selectedSubtotal = '0.00';
-  let selectedTax = '0.00';
-  let selectedGrandTotal = '0.00';
-  const taxRate = restaurant?.taxRate || '0.0825';
-
-  splitSelection.forEach((qty, orderItemId) => {
-    const item = tableSession.orders
-      .flatMap((o) => o.items)
-      .find((i) => i.orderItemId === orderItemId);
-    
-    if (item) {
-      const sub = decimalMath.multiply(item.price, qty);
-      selectedSubtotal = decimalMath.add(selectedSubtotal, sub);
-    }
-  });
-  selectedTax = decimalMath.calculateTax(selectedSubtotal, taxRate);
-  selectedGrandTotal = decimalMath.add(selectedSubtotal, selectedTax);
+  const grandTotal = parseFloat(tableSession?.billing?.remaining?.grandTotal || '0');
+  const totalAllocated = contributors.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+  const remaining = grandTotal - totalAllocated;
 
   const executeCheckout = async () => {
-    if (splitSelection.size === 0) return;
+    const payloadItems = getFullUnpaidItemsPayload();
+    if (payloadItems.length === 0) return;
+    
     setPaymentProcessing(true);
-
-    const payloadItems = Array.from(splitSelection.entries()).map(([orderItemId, quantityToPay]) => ({
-      orderItemId,
-      quantityToPay
-    }));
 
     try {
       const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-split`, {
@@ -168,8 +171,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         throw new Error(errData.error || 'Payment failed');
       }
 
-      // Clear splits selection on success
-      setSplitSelection(new Map());
+      setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
       setPaymentSuccess(true);
       setTimeout(() => setPaymentSuccess(false), 5000);
       setActiveTab('menu');
@@ -221,51 +223,91 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         )}
 
         {activeTab === 'menu' && (
-          <div>
-            <h2 className="text-lg font-extrabold text-gray-800 mb-4 flex items-center gap-2">
-              <span>🍽️</span> Digital Menu
-            </h2>
-            <div className="space-y-4">
-              {menuItems.map((item) => (
+          <div className="pb-8">
+            <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md py-3 mb-2 -mx-4 px-4 border-b border-gray-100">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {categories.map(c => (
+                  <button 
+                    key={c}
+                    onClick={() => setActiveCategory(c)}
+                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
+                      activeCategory === c 
+                        ? 'bg-gray-900 text-white' 
+                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              {menuItems
+                .filter(item => activeCategory === 'All' || (item.category || 'Main Course') === activeCategory)
+                .map((item) => (
                 <div
                   key={item.id}
-                  className={`bg-white p-4 rounded-2xl shadow-sm border transition flex flex-col justify-between ${
-                    item.isAvailable ? 'border-gray-100 hover:shadow-md' : 'border-gray-200 opacity-60 bg-gray-100'
-                  }`}
+                  className="border-b border-gray-100 py-6 last:border-none flex justify-between items-start gap-4"
                 >
-                  <div className="flex justify-between items-start mb-2 gap-4">
-                    <div className="flex gap-3 flex-1">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="w-16 h-16 rounded-xl object-cover shadow-sm border border-gray-100 flex-shrink-0" />
-                      ) : (
-                        <div className="w-16 h-16 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-2xl flex-shrink-0">
-                          🍽️
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="font-bold text-gray-800 leading-tight">{item.name}</h3>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">{item.description || 'No description available.'}</p>
-                      </div>
+                  {/* Left Column */}
+                  <div className={`flex flex-col ${item.imageUrl ? 'w-[65%]' : 'w-full'}`}>
+                    {/* Mock Veg Tag */}
+                    <div className="w-3.5 h-3.5 border-2 border-green-600 flex items-center justify-center rounded-sm mb-1.5 opacity-80">
+                      <div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div>
                     </div>
-                    <span className="font-extrabold text-indigo-600 text-sm whitespace-nowrap">
+                    
+                    <h3 className="text-lg font-bold text-gray-800 leading-tight">
+                      {item.name}
+                    </h3>
+                    <div className="text-sm font-semibold text-gray-600 mt-0.5">
                       ${decimalMath.formatCurrency(item.price)}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 flex justify-end">
-                    {item.isAvailable ? (
-                      <button
-                        onClick={() => addItemToCart(item.id, 1)}
-                        className="bg-indigo-600 text-white text-xs px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 active:scale-95 transition shadow-sm"
-                      >
-                        + Add to Table Cart
-                      </button>
-                    ) : (
-                      <span className="text-xs text-red-500 font-extrabold bg-red-50 border border-red-200 px-3 py-1 rounded-xl">
-                        86'ed / Sold Out
-                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5 line-clamp-2 leading-relaxed pr-2">
+                      {item.description || 'No description available.'}
+                    </p>
+                    
+                    {!item.imageUrl && (
+                      <div className="mt-4">
+                        {item.isAvailable ? (
+                          <button
+                            onClick={() => addItemToCart(item.id, 1)}
+                            className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-xs px-6 py-2 rounded-lg uppercase transition-all active:scale-95"
+                          >
+                            ADD
+                          </button>
+                        ) : (
+                          <span className="text-xs text-red-500 font-extrabold">Out of Stock</span>
+                        )}
+                      </div>
                     )}
                   </div>
+
+                  {/* Right Column */}
+                  {item.imageUrl && (
+                    <div className="relative w-[35%] max-w-[140px] shrink-0">
+                      <div className="aspect-square w-full rounded-2xl overflow-hidden bg-gray-50 shadow-sm border border-gray-100">
+                        <img 
+                          src={`${item.imageUrl}?v=${imageCacheBuster.current}`}
+                          alt={item.name} 
+                          className={`w-full h-full object-cover ${!item.isAvailable ? 'grayscale opacity-60' : ''}`}
+                        />
+                      </div>
+                      
+                      {item.isAvailable ? (
+                        <button
+                          onClick={() => addItemToCart(item.id, 1)}
+                          className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-xs px-6 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform"
+                        >
+                          ADD
+                        </button>
+                      ) : (
+                        <div className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-400 border border-gray-200 shadow-sm font-bold text-[10px] px-3 py-1 rounded-lg uppercase whitespace-nowrap">
+                          Sold Out
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -352,7 +394,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               <div className="space-y-4">
                 {[...tableSession.orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(order => {
                   let statusColor = "bg-gray-100 text-gray-600 border-gray-200";
-                  let statusText = order.status;
+                  let statusText: string = order.status;
                   if (order.status === 'NEW') { statusColor = "bg-emerald-50 text-emerald-700 border-emerald-200"; statusText = "Sent to Kitchen"; }
                   else if (order.status === 'PREPARING') { statusColor = "bg-amber-50 text-amber-700 border-amber-200"; statusText = "Preparing"; }
                   else if (order.status === 'READY_TO_SERVE') { statusColor = "bg-indigo-50 text-indigo-700 border-indigo-200"; statusText = "Ready to Serve"; }
@@ -400,16 +442,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </div>
                   <div className="space-y-4">
                     <button
-                      onClick={() => {
-                        const newSelection = new Map<string, number>();
-                        tableSession.orders.flatMap((o: any) => o.items).forEach((item: any) => {
-                          if (item.unpaidQuantity > 0) {
-                            newSelection.set(item.orderItemId, item.unpaidQuantity);
-                          }
-                        });
-                        setSplitSelection(newSelection);
-                        setCheckoutMode('PAY_FULL');
-                      }}
+                      onClick={() => setCheckoutMode('PAY_FULL')}
                       className="w-full h-20 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-transform rounded-2xl flex flex-col items-center justify-center text-white shadow-lg shadow-blue-600/30 border border-blue-500"
                     >
                       <span className="font-black text-xl tracking-tight">Pay Full Bill</span>
@@ -417,7 +450,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     </button>
                     <button
                       onClick={() => {
-                        setSplitSelection(new Map());
+                        setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
                         setCheckoutMode('SPLIT');
                       }}
                       className="w-full h-20 border-2 border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform rounded-2xl flex flex-col items-center justify-center text-gray-800"
@@ -449,7 +482,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                      <span className="text-6xl">💰</span>
                    </div>
                    <p className="text-blue-800 font-bold mb-2 uppercase tracking-widest text-xs relative z-10">Total Remaining Balance</p>
-                   <p className="text-6xl font-black text-blue-600 tabular-nums tracking-tighter relative z-10">${selectedGrandTotal}</p>
+                   <p className="text-6xl font-black text-blue-600 tabular-nums tracking-tighter relative z-10">${tableSession?.billing?.remaining?.grandTotal || '0.00'}</p>
                 </div>
                 
                 <div className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-sm space-y-4">
@@ -479,10 +512,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             )}
 
             {checkoutMode === 'SPLIT' && (
-              <div className="animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-extrabold text-gray-800 flex items-center gap-2">
-                    <span>🧾</span> Split Billing
+              <div className="animate-fade-in space-y-6 pb-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                    <span>🧾</span> Custom Split
                   </h2>
                   <button 
                     onClick={() => setCheckoutMode('CHOICE')} 
@@ -491,100 +524,84 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     Back to Options
                   </button>
                 </div>
-                <div className="bg-white border rounded-2xl p-4 shadow-sm mb-6">
-                  <h3 className="font-extrabold text-sm text-gray-800 border-b pb-2 mb-3">Claim Items You Ate</h3>
+
+                {/* Tracker Header */}
+                <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 shadow-sm text-center relative overflow-hidden">
+                  <p className="text-indigo-800 font-bold mb-1 uppercase tracking-widest text-xs">Total Bill</p>
+                  <p className="text-5xl font-black text-indigo-600 tabular-nums tracking-tighter">${grandTotal.toFixed(2)}</p>
                   
-                  {tableSession.orders.flatMap((o: any) => o.items).length === 0 ? (
-                    <p className="text-center py-6 text-gray-400 text-sm">No items submitted yet.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {tableSession.orders
-                        .flatMap((o: any) => o.items)
-                        .map((item: any) => {
-                          const maxQty = item.unpaidQuantity;
-                          const selected = splitSelection.get(item.orderItemId) || 0;
-
-                          return (
-                            <div key={item.orderItemId} className="flex justify-between items-center py-2 border-b last:border-0">
-                              <div>
-                                <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
-                                <div className="flex gap-2 mt-0.5">
-                                  <span className="text-xs text-gray-400">Total: {item.orderedQuantity}</span>
-                                  <span className="text-xs text-emerald-600">Paid: {item.paidQuantity}</span>
-                                  <span className="text-xs text-amber-600">Unpaid: {maxQty}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-indigo-600 font-extrabold">${item.price} ea</span>
-                                <div className="flex items-center border rounded-lg overflow-hidden bg-gray-50">
-                                  <button
-                                    onClick={() => handleSplitQtyChange(item.orderItemId, -0.5, maxQty)}
-                                    disabled={selected <= 0}
-                                    className="bg-gray-100 hover:bg-gray-200 px-2 py-1 text-xs font-bold disabled:opacity-30"
-                                  >
-                                    -0.5
-                                  </button>
-                                  <span className="px-2 text-xs font-extrabold text-gray-800">{selected}</span>
-                                  <button
-                                    onClick={() => handleSplitQtyChange(item.orderItemId, 0.5, maxQty)}
-                                    disabled={selected >= maxQty}
-                                    className="bg-gray-100 hover:bg-gray-200 px-2 py-1 text-xs font-bold disabled:opacity-30"
-                                  >
-                                    +0.5
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
+                  <div className="mt-4 p-3 bg-white/60 rounded-xl">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remaining to Allocate</p>
+                    <p className={`text-2xl font-black tabular-nums transition-colors ${
+                      remaining === 0 ? 'text-emerald-500' : 
+                      remaining < 0 ? 'text-red-500' : 'text-gray-800'
+                    }`}>
+                      ${Math.abs(remaining).toFixed(2)}
+                    </p>
+                    {remaining === 0 && <p className="text-emerald-600 text-sm font-bold mt-1">✨ Bill fully allocated!</p>}
+                    {remaining < 0 && <p className="text-red-600 text-sm font-bold mt-1">⚠️ Exceeds total by ${Math.abs(remaining).toFixed(2)}</p>}
+                  </div>
                 </div>
 
-                {splitSelection.size > 0 && (
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 shadow-sm space-y-3 mb-6">
-                    <h3 className="font-bold text-indigo-900 text-sm">Your Personal Invoice Segment</h3>
-                    <div className="space-y-1.5 text-xs text-indigo-700">
-                      <div className="flex justify-between">
-                        <span>Subtotal:</span>
-                        <span className="font-bold">${selectedSubtotal}</span>
+                {/* Dynamic Rows */}
+                <div className="space-y-3">
+                  {contributors.map((contributor, index) => (
+                    <div key={contributor.id} className="flex gap-2 items-center bg-white border border-gray-200 p-2 rounded-2xl shadow-sm">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Name"
+                          value={contributor.name}
+                          onChange={(e) => {
+                            const newC = [...contributors];
+                            newC[index].name = e.target.value;
+                            setContributors(newC);
+                          }}
+                          className="w-full px-3 py-2 bg-transparent text-sm font-bold text-gray-800 focus:outline-none"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <span>Fractional Tax ({(Number(taxRate) * 100).toFixed(2)}%):</span>
-                        <span className="font-bold">${decimalMath.formatCurrency(selectedTax)}</span>
+                      <div className="w-1/3 relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={contributor.amount}
+                          onChange={(e) => {
+                            const newC = [...contributors];
+                            newC[index].amount = e.target.value;
+                            setContributors(newC);
+                          }}
+                          className="w-full pl-7 pr-3 py-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
                       </div>
-                      <div className="flex justify-between border-t border-indigo-200 pt-2 text-sm text-indigo-950 font-extrabold">
-                        <span>Grand Total:</span>
-                        <span>${selectedGrandTotal}</span>
-                      </div>
+                      {contributors.length > 2 && (
+                        <button
+                          onClick={() => setContributors(contributors.filter((_, i) => i !== index))}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
+                  ))}
+                  
+                  <button
+                    onClick={() => setContributors([...contributors, { id: Date.now(), name: `Payer ${contributors.length + 1}`, amount: "" }])}
+                    className="w-full py-3 border-2 border-dashed border-gray-300 rounded-2xl text-gray-500 font-bold text-sm hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  >
+                    + Add Person
+                  </button>
+                </div>
 
-                    <div className="space-y-3 pt-3">
-                      <input
-                        type="text"
-                        placeholder="Your Name"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full text-xs px-3 py-2 border rounded-lg focus:outline-indigo-500"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Your Phone Number"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        className="w-full text-xs px-3 py-2 border rounded-lg focus:outline-indigo-500"
-                      />
-                      <button
-                        onClick={executeCheckout}
-                        disabled={paymentProcessing || !customerName}
-                        className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 active:scale-95 transition-transform disabled:opacity-40 shadow-sm"
-                      >
-                        {paymentProcessing ? 'Processing Split Payment...' : 'Proceed to Checkout Payment'}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={executeCheckout}
+                  disabled={paymentProcessing || remaining !== 0}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white font-black py-5 rounded-2xl shadow-lg shadow-emerald-500/30 disabled:opacity-50 mt-4 text-lg tracking-tight"
+                >
+                  {paymentProcessing ? 'Processing Payment...' : 'Proceed to Payment'}
+                </button>
               </div>
             )}
           </div>

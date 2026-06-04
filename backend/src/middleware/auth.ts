@@ -75,7 +75,7 @@ export function requireRole(allowedRoles: ('ADMIN' | 'KITCHEN')[]) {
       return reply.code(401).send({ error: 'Missing or malformed Authorization header' });
     }
 
-    const token = authHeader.substring(7);
+    const token = authHeader.substring(7).trim();
     const decoded = verifyUserToken(token);
     
     if (!decoded) {

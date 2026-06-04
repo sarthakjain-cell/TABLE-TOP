@@ -31,6 +31,17 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
     }
   });
 
+  // Get all restaurants (for auto-linking in dev/prototype)
+  fastify.get('/api/restaurants', async (request, reply) => {
+    try {
+      const restaurants = await prisma.restaurant.findMany();
+      return restaurants;
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to fetch restaurants' });
+    }
+  });
+
   // Get restaurant by ID
   fastify.get<{ Params: { id: string } }>('/api/restaurants/:id', async (request, reply) => {
     const { id } = request.params;

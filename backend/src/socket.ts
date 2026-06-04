@@ -445,17 +445,20 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
         ioInstance.to(sessionRoom).emit('orderStatusUpdated', { orderId: order.updatedOrder.id, status: 'NEW' });
 
         // Trigger Audio-Visual kitchen alert with ticket details
-        ioInstance.emit('orderStatusUpdated', {
-          orderId: order.updatedOrder.id,
-          status: 'NEW',
-          tableNumber: order.tableNumber,
-          restaurantId: order.restaurantId,
-          items: order.updatedOrder.items.map(i => ({
-            name: i.menuItem.name,
-            quantity: new Decimal(i.quantity.toString()).toNumber(),
-            modifications: i.modifications
-          })),
-          createdAt: order.updatedOrder.createdAt
+        ioInstance.emit('newOrderReceived', {
+          order: {
+            id: order.updatedOrder.id,
+            status: 'NEW',
+            tableNumber: order.tableNumber,
+            restaurantId: order.restaurantId,
+            items: order.updatedOrder.items.map(i => ({
+              id: i.id,
+              name: i.menuItem.name,
+              quantity: new Decimal(i.quantity.toString()).toNumber(),
+              modifications: i.modifications
+            })),
+            createdAt: order.updatedOrder.createdAt
+          }
         });
 
         if (callback) callback({ success: true });
