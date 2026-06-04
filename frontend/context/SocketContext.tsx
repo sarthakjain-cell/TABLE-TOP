@@ -95,8 +95,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const hasCookie = document.cookie.includes('tabletop_auth_token=');
       const savedToken = localStorage.getItem('tabletop_auth_token');
-      if (savedToken) setAuthTokenState(savedToken);
+      if (savedToken && hasCookie) {
+        setAuthTokenState(savedToken);
+      } else if (savedToken && !hasCookie) {
+        localStorage.removeItem('tabletop_auth_token');
+      }
     }
 
     // Initialize Socket client
