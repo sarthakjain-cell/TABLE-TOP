@@ -41,6 +41,8 @@ interface MenuItem {
   name: string;
   description: string | null;
   price: string;
+  halfPrice?: string | null;
+  hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
   imageUrl?: string;
@@ -61,6 +63,7 @@ export default function AdminPage() {
   const { isConnected, socket, authToken, setAuthToken } = useSocket();
   const [restaurantId, setRestaurantId] = useState<string>('');
   const [restaurantName, setRestaurantName] = useState<string>('Table Top SaaS');
+  const [allRestaurants, setAllRestaurants] = useState<{id: string, name: string}[]>([]);
   const [taxRate, setTaxRate] = useState<string>('0.0825');
   const [operationalMode, setOperationalMode] = useState<'FULL_SERVICE' | 'SELF_SERVICE'>('FULL_SERVICE');
   const [gstEstablishmentType, setGstEstablishmentType] = useState<'STANDALONE' | 'HOTEL'>('STANDALONE');
@@ -68,13 +71,18 @@ export default function AdminPage() {
   const [tables, setTables] = useState<Table[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [ledgerFilterDate, setLedgerFilterDate] = useState<string>('');
+  const [ledgerFilterMonth, setLedgerFilterMonth] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger'>('dashboard');
-  const [inputToken, setInputToken] = useState('');
-  
+  const [inputRestaurantId, setInputRestaurantId] = useState('');
+  const [inputPasscode, setInputPasscode] = useState('');
+  const [loginError, setLoginError] = useState('');
   // Menu Item creation states
   const [newDishName, setNewDishName] = useState('');
   const [newDishPrice, setNewDishPrice] = useState('');
+  const [newDishHasHalfPortion, setNewDishHasHalfPortion] = useState(false);
+  const [newDishHalfPrice, setNewDishHalfPrice] = useState('');
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
@@ -87,6 +95,8 @@ export default function AdminPage() {
   const [editingDish, setEditingDish] = useState<MenuItem | null>(null);
   const [editDishName, setEditDishName] = useState('');
   const [editDishPrice, setEditDishPrice] = useState('');
+  const [editDishHasHalfPortion, setEditDishHasHalfPortion] = useState(false);
+  const [editDishHalfPrice, setEditDishHalfPrice] = useState('');
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
@@ -226,19 +236,6 @@ export default function AdminPage() {
          storedRestId = '';
          if (typeof window !== 'undefined') localStorage.removeItem('tabletop_restaurant_id');
       }
-
-      if (!storedRestId && authToken) {
-        try {
-          const res = await fetch('/api/restaurants');
-          const data = await res.json();
-          if (data && data.length > 0) {
-            storedRestId = data[0].id;
-            localStorage.setItem('tabletop_restaurant_id', storedRestId);
-          }
-        } catch (e) {
-          console.error('Failed to auto-fetch default restaurant', e);
-        }
-      }
       
       setRestaurantId(storedRestId);
 
@@ -260,13 +257,9 @@ export default function AdminPage() {
               setTables(sorted);
             }
           } else {
-             const r = await fetch('/api/restaurants');
-             const d = await r.json();
-             if (d && d.length > 0) {
-                const newId = d[0].id;
-                localStorage.setItem('tabletop_restaurant_id', newId);
-                window.location.reload();
-             }
+             // Auth failed or restaurant not found, clear token
+             setAuthToken(null);
+             if (typeof window !== 'undefined') localStorage.removeItem('tabletop_restaurant_id');
           }
         })
         .catch(err => console.error('Error fetching admin restaurant configs', err));
@@ -444,6 +437,8 @@ export default function AdminPage() {
           restaurantId, 
           name: newDishName, 
           price: Number(newDishPrice), 
+          halfPrice: newDishHasHalfPortion ? Number(newDishHalfPrice) : null,
+          hasHalfPortion: newDishHasHalfPortion,
           description: newDishDesc,
           category: newDishCategory || "Main Course",
           imageUrl: newDishImageUrl || undefined
@@ -453,6 +448,8 @@ export default function AdminPage() {
       if (res.ok) {
         setNewDishName('');
         setNewDishPrice('');
+        setNewDishHasHalfPortion(false);
+        setNewDishHalfPrice('');
         setNewDishDesc('');
         setNewDishCategory('');
         setNewDishImageUrl('');
@@ -480,6 +477,8 @@ export default function AdminPage() {
         body: JSON.stringify({ 
           name: editDishName, 
           price: Number(editDishPrice), 
+          halfPrice: editDishHasHalfPortion ? Number(editDishHalfPrice) : null,
+          hasHalfPortion: editDishHasHalfPortion,
           description: editDishDesc,
           category: editDishCategory || "Main Course",
           imageUrl: editDishImageUrl || undefined
@@ -530,6 +529,8 @@ export default function AdminPage() {
     setEditingDish(item);
     setEditDishName(item.name);
     setEditDishPrice(item.price);
+    setEditDishHasHalfPortion(!!item.hasHalfPortion);
+    setEditDishHalfPrice(item.halfPrice || '');
     setEditDishDesc(item.description || '');
     setEditDishCategory(item.category || 'Main Course');
     setEditDishImageUrl(item.imageUrl || '');
@@ -582,27 +583,61 @@ export default function AdminPage() {
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg border border-gray-200 p-8 space-y-6">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Admin Portal</h1>
-            <p className="text-gray-500 text-sm mt-2">Enter your secure access token</p>
+            <p className="text-gray-500 text-sm mt-2">Enter your Restaurant ID and secure Passcode</p>
           </div>
           <form 
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              if (inputToken.trim()) setAuthToken(inputToken.trim());
+              setLoginError('');
+              if (!inputRestaurantId.trim() || !inputPasscode.trim()) {
+                setLoginError('Both fields are required');
+                return;
+              }
+              try {
+                const res = await fetch('/api/auth/login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ restaurantId: inputRestaurantId.trim(), passcode: inputPasscode.trim() })
+                });
+                const data = await res.json();
+                if (res.ok && data.token) {
+                  localStorage.setItem('tabletop_restaurant_id', data.restaurant.id);
+                  setAuthToken(data.token);
+                } else {
+                  setLoginError(data.error || 'Authentication failed');
+                }
+              } catch (err) {
+                setLoginError('Network error. Please try again.');
+              }
             }} 
             className="space-y-4"
           >
-            <input
-              type="password"
-              placeholder="••••••••••••"
-              value={inputToken}
-              onChange={e => setInputToken(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
-            />
+            {loginError && <div className="p-3 bg-red-100 border border-red-200 text-red-600 rounded text-sm text-center font-semibold">{loginError}</div>}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Restaurant ID</label>
+              <input
+                type="text"
+                placeholder="e.g. 123e4567-e89b-12d3..."
+                value={inputRestaurantId}
+                onChange={e => setInputRestaurantId(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Passcode</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={inputPasscode}
+                onChange={e => setInputPasscode(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+              />
+            </div>
             <button
               type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors shadow-sm"
             >
-              Authenticate
+              Secure Login
             </button>
           </form>
         </div>
@@ -880,6 +915,9 @@ export default function AdminPage() {
                           </td>
                           <td className="px-6 py-4 text-sm font-semibold text-gray-900">
                             ${Number(item.price).toFixed(2)}
+                            {item.hasHalfPortion && item.halfPrice && (
+                              <span className="block text-xs text-blue-600 mt-1">Half: ${Number(item.halfPrice).toFixed(2)}</span>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -925,6 +963,25 @@ export default function AdminPage() {
                         className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                       />
                     </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input 
+                        type="checkbox" 
+                        id="newHalfPortion"
+                        checked={newDishHasHalfPortion}
+                        onChange={(e) => setNewDishHasHalfPortion(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <label htmlFor="newHalfPortion" className="text-sm font-medium text-gray-700">Offers Half Portion?</label>
+                    </div>
+                    {newDishHasHalfPortion && (
+                      <div className="mb-4">
+                        <input
+                          type="number" step="0.01" placeholder="Half Portion Price" required
+                          value={newDishHalfPrice} onChange={(e) => setNewDishHalfPrice(e.target.value)}
+                          className="w-1/2 bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        />
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                       <input
                         type="text" list="categories" placeholder="Category (e.g. Breads)" required
@@ -1022,9 +1079,39 @@ export default function AdminPage() {
 
           {activeTab === 'ledger' && (
              <div className="max-w-4xl mx-auto space-y-6">
-                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Financials & Ledger</h3>
-                  <p className="text-sm text-gray-500 mt-1">Review recent transactions and generate reports.</p>
+                 <div className="flex justify-between items-end">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Financials & Ledger</h3>
+                    <p className="text-sm text-gray-500 mt-1">Review recent transactions and generate reports.</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Filter by Date</label>
+                      <input 
+                        type="date" 
+                        value={ledgerFilterDate} 
+                        onChange={(e) => { setLedgerFilterDate(e.target.value); setLedgerFilterMonth(''); }}
+                        className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Filter by Month</label>
+                      <input 
+                        type="month" 
+                        value={ledgerFilterMonth} 
+                        onChange={(e) => { setLedgerFilterMonth(e.target.value); setLedgerFilterDate(''); }}
+                        className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    {(ledgerFilterDate || ledgerFilterMonth) && (
+                      <button 
+                        onClick={() => { setLedgerFilterDate(''); setLedgerFilterMonth(''); }}
+                        className="text-xs text-blue-600 font-semibold mb-2 hover:underline self-end"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 {(() => {
@@ -1033,7 +1120,23 @@ export default function AdminPage() {
                   let todaySales = 0;
                   let totalTaxCollected = 0;
 
-                  transactions.forEach(tx => {
+                  const filteredTransactions = transactions.filter(tx => {
+                    if (!tx.createdAt) return false;
+                    const txDate = new Date(tx.createdAt);
+                    if (ledgerFilterDate) {
+                      const tzOffset = txDate.getTimezoneOffset() * 60000;
+                      const localISOTime = (new Date(txDate.getTime() - tzOffset)).toISOString().split('T')[0];
+                      return localISOTime === ledgerFilterDate;
+                    }
+                    if (ledgerFilterMonth) {
+                      const tzOffset = txDate.getTimezoneOffset() * 60000;
+                      const localISOMonth = (new Date(txDate.getTime() - tzOffset)).toISOString().slice(0, 7);
+                      return localISOMonth === ledgerFilterMonth;
+                    }
+                    return true;
+                  });
+
+                  filteredTransactions.forEach(tx => {
                     const amt = Number(tx.amount) || 0;
                     const tax = Number(tx.taxPaid) || 0;
                     overallSales += amt;
@@ -1049,10 +1152,11 @@ export default function AdminPage() {
                   const gstPayable = totalSubtotal * gstRate;
 
                   return (
+                    <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
-                          <TrendingUp size={18} /> <span className="font-semibold text-sm">Overall Sales</span>
+                          <TrendingUp size={18} /> <span className="font-semibold text-sm">{ledgerFilterDate || ledgerFilterMonth ? 'Filtered Sales' : 'Overall Sales'}</span>
                         </div>
                         <div className="text-2xl font-black text-gray-900 tabular-nums">${overallSales.toFixed(2)}</div>
                       </div>
@@ -1066,7 +1170,7 @@ export default function AdminPage() {
 
                       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
-                          <Receipt size={18} /> <span className="font-semibold text-sm">Tax Collected</span>
+                          <Receipt size={18} /> <span className="font-semibold text-sm">{ledgerFilterDate || ledgerFilterMonth ? 'Filtered Tax' : 'Tax Collected'}</span>
                         </div>
                         <div className="text-2xl font-black text-gray-900 tabular-nums">${totalTaxCollected.toFixed(2)}</div>
                       </div>
@@ -1091,8 +1195,6 @@ export default function AdminPage() {
                          </div>
                       </div>
                     </div>
-                  );
-                })()}
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <table className="w-full text-left">
@@ -1101,11 +1203,11 @@ export default function AdminPage() {
                         <th className="px-6 py-4">Transaction ID</th>
                         <th className="px-6 py-4">Amount</th>
                         <th className="px-6 py-4">Customer</th>
-                        <th className="px-6 py-4 text-right">Time</th>
+                        <th className="px-6 py-4 text-right">Date & Time</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {transactions.map(tx => (
+                      {filteredTransactions.map(tx => (
                         <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4">
                             <p className="text-sm font-mono text-gray-600">{tx.id}</p>
@@ -1120,13 +1222,24 @@ export default function AdminPage() {
                              <p className="text-xs text-gray-500">{tx.customerPhone || 'N/A'}</p>
                           </td>
                           <td className="px-6 py-4 text-right text-sm text-gray-600 whitespace-nowrap tabular-nums">
-                            {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(tx.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} <br/>
+                            <span className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </td>
                         </tr>
                       ))}
+                      {filteredTransactions.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-center text-gray-500 text-sm">
+                            No transactions found for the selected filter.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
+                </>
+                  );
+                })()}
              </div>
           )}
         </div>
@@ -1224,6 +1337,25 @@ export default function AdminPage() {
                       className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                     />
                   </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input 
+                      type="checkbox" 
+                      id="editHalfPortion"
+                      checked={editDishHasHalfPortion}
+                      onChange={(e) => setEditDishHasHalfPortion(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="editHalfPortion" className="text-sm font-medium text-gray-700">Offers Half Portion?</label>
+                  </div>
+                  {editDishHasHalfPortion && (
+                    <div className="mb-4">
+                      <input
+                        type="number" step="0.01" placeholder="Half Portion Price" required
+                        value={editDishHalfPrice} onChange={(e) => setEditDishHalfPrice(e.target.value)}
+                        className="w-1/2 bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       type="text" list="categories" placeholder="Category (e.g. Breads)" required
