@@ -4,7 +4,6 @@ import { signTableToken, verifyTableToken } from '../utils/token';
 import { requireRole } from '../middleware/auth';
 
 interface CreateTableBody {
-  restaurantId: string;
   number: string;
 }
 
@@ -13,12 +12,13 @@ interface UpdateStatusBody {
 }
 
 export const tableRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  // Create a new table and generate its secure QR token
-  fastify.post<{ Body: CreateTableBody }>('/api/tables', async (request, reply) => {
-    const { restaurantId, number } = request.body;
+  // Create a new table and generate its secure QR token (Admin protected)
+  fastify.post<{ Body: CreateTableBody }>('/api/tables', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+    const { number } = request.body;
+    const restaurantId = request.user!.restaurantId;
 
-    if (!restaurantId || !number) {
-      return reply.code(400).send({ error: 'restaurantId and table number are required' });
+    if (!number) {
+      return reply.code(400).send({ error: 'Table number is required' });
     }
 
     try {
@@ -145,15 +145,21 @@ export const tableRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   fastify.post('/api/tables/verify', verifyTokenHandler);
 
   // Explicitly update table status (Vacant / Occupied)
-  fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/tables/:id/status', async (request, reply) => {
+  fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/tables/:id/status', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
     const { id } = request.params;
     const { status } = request.body;
+    const restaurantId = request.user!.restaurantId;
 
     if (status !== 'VACANT' && status !== 'OCCUPIED') {
       return reply.code(400).send({ error: 'Invalid table status' });
     }
 
     try {
+      const existingTable = await prisma.table.findUnique({ where: { id } });
+      if (!existingTable || existingTable.restaurantId !== restaurantId) {
+        return reply.code(403).send({ error: 'Forbidden: Table does not belong to this restaurant' });
+      }
+
       const updatedTable = await prisma.table.update({
         where: { id },
         data: { status }
@@ -181,6 +187,10 @@ export const tableRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       if (!table) {
         return reply.code(404).send({ error: 'Table not found' });
+      }
+
+      if (table.restaurantId !== request.user!.restaurantId) {
+        return reply.code(403).send({ error: 'Forbidden' });
       }
 
       if (table.sessions.length > 0) {

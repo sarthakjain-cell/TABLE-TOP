@@ -33,12 +33,16 @@ export function middleware(request: NextRequest) {
 
         // Admin route restriction
         if (pathname.startsWith('/admin') && role !== 'ADMIN') {
-          return NextResponse.redirect(new URL('/', request.url));
+          const response = NextResponse.redirect(new URL('/admin', request.url));
+          response.cookies.delete('tabletop_auth_token');
+          return response;
         }
 
         // Kitchen route restriction (permits KITCHEN and ADMIN roles)
         if (pathname.startsWith('/kitchen') && role !== 'ADMIN' && role !== 'KITCHEN') {
-          return NextResponse.redirect(new URL('/', request.url));
+          const response = NextResponse.redirect(new URL('/kitchen', request.url));
+          response.cookies.delete('tabletop_auth_token');
+          return response;
         }
       } catch (err) {
         // If the token is corrupted, clear the cookie and redirect to root

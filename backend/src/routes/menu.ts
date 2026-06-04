@@ -4,10 +4,11 @@ import { getIO } from '../socket';
 import { requireRole } from '../middleware/auth';
 
 interface CreateMenuItemBody {
-  restaurantId: string;
   name: string;
   description?: string;
   price: number;
+  halfPrice?: number;
+  hasHalfPortion?: boolean;
   category?: string;
   imageUrl?: string;
 }
@@ -16,6 +17,8 @@ interface UpdateMenuItemBody {
   name?: string;
   description?: string;
   price?: number;
+  halfPrice?: number;
+  hasHalfPortion?: boolean;
   category?: string;
   imageUrl?: string;
 }
@@ -39,19 +42,21 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     schema: {
       body: {
         type: 'object',
-        required: ['restaurantId', 'name', 'price'],
+        required: ['name', 'price'],
         properties: {
-          restaurantId: { type: 'string' },
           name: { type: 'string', maxLength: 255 },
           description: { type: 'string', nullable: true },
           price: { type: 'number', minimum: 0 },
+          halfPrice: { type: 'number', minimum: 0, nullable: true },
+          hasHalfPortion: { type: 'boolean', nullable: true },
           category: { type: 'string', maxLength: 100, nullable: true },
           imageUrl: imageUrlSchema,
         },
       },
     },
   }, async (request, reply) => {
-    const { restaurantId, name, description, price, category, imageUrl } = request.body;
+    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl } = request.body;
+    const restaurantId = request.user!.restaurantId;
 
     try {
       const menuItem = await prisma.menuItem.create({
@@ -60,6 +65,8 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           name,
           description,
           price: String(price), // Prisma decimal parses string representation
+          halfPrice: halfPrice !== undefined && halfPrice !== null ? String(halfPrice) : null,
+          hasHalfPortion: hasHalfPortion || false,
           category: category || "Main Course",
           imageUrl,
         },
@@ -119,6 +126,8 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           name: { type: 'string', maxLength: 255 },
           description: { type: 'string', nullable: true },
           price: { type: 'number', minimum: 0 },
+          halfPrice: { type: 'number', minimum: 0, nullable: true },
+          hasHalfPortion: { type: 'boolean', nullable: true },
           category: { type: 'string', maxLength: 100, nullable: true },
           imageUrl: imageUrlSchema,
         },
@@ -126,22 +135,33 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     },
   }, async (request, reply) => {
     const { id } = request.params;
-    const { name, description, price, category, imageUrl } = request.body;
+    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl } = request.body;
+    const restaurantId = request.user!.restaurantId;
 
     try {
+      // BOLA/IDOR Protection: Ensure item belongs to the user's isolated restaurant
+      const existingItem = await prisma.menuItem.findFirst({
+        where: { id, restaurantId }
+      });
+      if (!existingItem) {
+        return reply.code(403).send({ error: 'Forbidden: Menu item does not belong to this restaurant.' });
+      }
+
       const updatedItem = await prisma.menuItem.update({
         where: { id },
         data: {
           name,
           description,
           price: price !== undefined ? String(price) : undefined,
+          halfPrice: halfPrice !== undefined ? (halfPrice !== null ? String(halfPrice) : null) : undefined,
+          hasHalfPortion: hasHalfPortion !== undefined ? hasHalfPortion : undefined,
           category,
-          imageUrl,
+          imageUrl: imageUrl !== undefined ? imageUrl : undefined,
         },
       });
       const io = getIO();
       if (io) {
-        io.emit('menuUpdated', { restaurantId: updatedItem.restaurantId });
+        io.emit('menuUpdated', { restaurantId });
       }
       return updatedItem;
     } catch (error) {

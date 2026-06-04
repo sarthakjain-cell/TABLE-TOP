@@ -40,6 +40,7 @@ enum TransactionStatus {
 model Restaurant {
   id              String          @id @default(uuid())
   name            String
+  passcodeHash    String?
   operationalMode OperationalMode @default(FULL_SERVICE)
   taxRate         Decimal         @db.Decimal(5, 4) // e.g. 0.0825 for 8.25%
   createdAt       DateTime        @default(now())
@@ -75,18 +76,20 @@ model Session {
 }
 
 model MenuItem {
-  id           String      @id @default(uuid())
-  name         String
-  description  String?
-  price        Decimal     @db.Decimal(10, 2)
-  category     String      @default("Main Course")
-  imageUrl     String?     // Cloudinary URL for the dish photo
-  isAvailable  Boolean     @default(true)
-  restaurantId String
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  orderItems   OrderItem[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  name           String
+  description    String?
+  price          Decimal     @db.Decimal(10, 2)
+  halfPrice      Decimal?    @db.Decimal(10, 2)
+  hasHalfPortion Boolean     @default(false)
+  category       String      @default("Main Course")
+  imageUrl       String?     // Cloudinary URL for the dish photo
+  isAvailable    Boolean     @default(true)
+  restaurantId   String
+  restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems     OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 }
 
 model Order {
