@@ -352,12 +352,18 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
             }
           } else {
             if (qtyToAdd.gt(0)) {
+              const isHalfPortion = (modifications || []).includes('Half Portion');
+              if (isHalfPortion && !menuItem.hasHalfPortion) {
+                throw new Error(`"${menuItem.name}" does not offer a half portion`);
+              }
+              const itemPrice = isHalfPortion && menuItem.halfPrice ? menuItem.halfPrice : menuItem.price;
+
               await tx.orderItem.create({
                 data: {
                   orderId: order.id,
                   menuItemId,
                   quantity: qtyToAdd,
-                  price: menuItem.price,
+                  price: itemPrice,
                   modifications: modifications || []
                 }
               });
