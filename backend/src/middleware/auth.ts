@@ -13,6 +13,7 @@ declare module 'fastify' {
     user?: {
       userId: string;
       role: 'ADMIN' | 'KITCHEN';
+      restaurantId: string;
     };
   }
 }

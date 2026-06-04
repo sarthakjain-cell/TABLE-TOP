@@ -68,6 +68,11 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   // Fetch recent completed transactions for ledger
   fastify.get<{ Params: { id: string } }>('/api/restaurants/:id/transactions', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
+    
+    if (request.user!.restaurantId !== id) {
+      return reply.code(403).send({ error: 'Forbidden: Cannot access transactions for a different restaurant' });
+    }
+
     try {
       const transactions = await prisma.transaction.findMany({
         where: {
@@ -90,6 +95,10 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   fastify.patch<{ Params: { id: string }; Body: UpdateModeBody }>('/api/restaurants/:id/mode', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
     const { mode } = request.body;
+
+    if (request.user!.restaurantId !== id) {
+      return reply.code(403).send({ error: 'Forbidden: Cannot update mode for a different restaurant' });
+    }
 
     if (mode !== 'FULL_SERVICE' && mode !== 'SELF_SERVICE') {
       return reply.code(400).send({ error: 'Invalid operational mode' });
