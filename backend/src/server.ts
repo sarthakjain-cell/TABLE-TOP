@@ -34,7 +34,7 @@ fastify.register(fastifyMultipart, {
 
 // CORS Configuration
 fastify.register(cors, {
-  origin: '*',
+  origin: process.env.FRONTEND_URL || '*',
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
 });
 
@@ -58,7 +58,7 @@ fastify.get('/health', async () => {
   return { status: 'ok', uptime: process.uptime() };
 });
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 5000;
 
 const start = async () => {
   try {

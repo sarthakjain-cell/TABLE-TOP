@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
 
 interface OrderItem {
+  orderedQuantity: number;
   id?: string;
   name: string;
   price: string;
@@ -421,7 +422,7 @@ export default function AdminPage() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:3001/api/upload', {
+      const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`
