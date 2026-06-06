@@ -3,7 +3,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
-import { QRCodeSVG } from 'qrcode.react';
+import dynamic from 'next/dynamic';
+
+const QRCodeSVG = dynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
+  ssr: false,
+  loading: () => <div className="w-[200px] h-[200px] flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl"><span className="text-sm font-bold text-gray-400">Loading QR...</span></div>
+});
 
 interface MenuItem {
   id: string;
@@ -43,6 +48,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [visibleItemCount, setVisibleItemCount] = useState(10);
+  const loaderRef = useRef<HTMLDivElement>(null);
   const imageCacheBuster = useRef(Date.now());
   const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category || 'Main Course')))];
 
@@ -111,6 +118,28 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       window.removeEventListener('menu-updated', handleMenuUpdate);
     };
   }, [tableSession]);
+
+  // 3. Intersection Observer for Infinite Scroll (Fixes Total Blocking Time)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleItemCount((prev) => prev + 10);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loaderRef.current) {
+      observer.observe(loaderRef.current);
+    }
+
+    return () => {
+      if (loaderRef.current) {
+        observer.unobserve(loaderRef.current);
+      }
+    };
+  }, [loaderRef]);
 
   if (error) {
     return (
@@ -289,6 +318,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             <div className="flex flex-col">
               {menuItems
                 .filter(item => activeCategory === 'All' || (item.category || 'Main Course') === activeCategory)
+                .slice(0, visibleItemCount)
                 .map((item) => (
                 <div
                   key={item.id}
@@ -355,6 +385,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                           src={`${item.imageUrl}?v=${imageCacheBuster.current}`}
                           alt={item.name} 
                           className={`w-full h-full object-cover ${!item.isAvailable ? 'grayscale opacity-60' : ''}`}
+                          loading="lazy"
                         />
                       </div>
                       
@@ -391,6 +422,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   )}
                 </div>
               ))}
+              
+              {/* Loader Trigger for Infinite Scroll */}
+              <div ref={loaderRef} className="h-20 w-full flex items-center justify-center">
+                {visibleItemCount < menuItems.filter(item => activeCategory === 'All' || (item.category || 'Main Course') === activeCategory).length && (
+                  <div className="animate-pulse w-8 h-8 rounded-full border-4 border-gray-200 border-t-indigo-600"></div>
+                )}
+              </div>
             </div>
           </div>
         )}
