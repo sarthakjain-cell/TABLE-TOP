@@ -7,14 +7,20 @@ import { Clock, ToggleLeft, ToggleRight, CheckCircle, Flame, History, X, Bell } 
 interface KitchenTicket {
   id: string;
   tableNumber: string;
-  status: 'NEW' | 'PREPARING' | 'READY_TO_SERVE' | 'COMPLETED';
+  status: 'PAYMENT_PENDING' | 'NEW' | 'PREPARING' | 'READY_TO_SERVE' | 'COMPLETED';
   createdAt: string;
+  paymentMethod?: string;
+  totalAmount?: string;
   items: Array<{
     id: string;
     name: string;
     quantity: number;
     modifications: string[];
   }>;
+  guestClaim?: {
+    name: string;
+    room: string;
+  };
 }
 
 interface MenuItem {
@@ -30,6 +36,7 @@ export default function KitchenPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [restaurantId, setRestaurantId] = useState<string>('');
   const [operationalMode, setOperationalMode] = useState<'FULL_SERVICE' | 'SELF_SERVICE'>('FULL_SERVICE');
+  const [establishmentType, setEstablishmentType] = useState<'RESTAURANT' | 'HOTEL'>('RESTAURANT');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [inputTokenStr, setInputTokenStr] = useState<string>('');
   
@@ -81,16 +88,7 @@ export default function KitchenPage() {
       }
       
       if (!storedRestId && authToken) {
-        try {
-          const res = await fetch('/api/restaurants');
-          const data = await res.json();
-          if (data && data.length > 0) {
-            storedRestId = data[0].id;
-            localStorage.setItem('tabletop_restaurant_id', storedRestId);
-          }
-        } catch (e) {
-          console.error('Failed to auto-fetch default restaurant', e);
-        }
+         setErrorMessage("Restaurant ID not found");
       }
       
       setRestaurantId(storedRestId);
@@ -104,15 +102,11 @@ export default function KitchenPage() {
           .then(async data => {
             if (data.error) {
                setErrorMessage(data.error);
-               const r = await fetch('/api/restaurants');
-               const d = await r.json();
-               if (d && d.length > 0) {
-                  const newId = d[0].id;
-                  localStorage.setItem('tabletop_restaurant_id', newId);
-                  window.location.reload();
-               }
             }
-            else setOperationalMode(data.operationalMode);
+            else {
+              setOperationalMode(data.operationalMode);
+              setEstablishmentType(data.establishmentType);
+            }
           })
           .catch(console.error);
 
@@ -170,14 +164,30 @@ export default function KitchenPage() {
       }
     };
 
+    const handleModeChange = (data: { restaurantId: string, mode: 'FULL_SERVICE' | 'SELF_SERVICE' }) => {
+      if (data.restaurantId === restaurantId) setOperationalMode(data.mode);
+    };
+
+    const handleSettingsChange = (data: { restaurantId: string, establishmentType: 'RESTAURANT' | 'HOTEL' }) => {
+      if (data.restaurantId === restaurantId) setEstablishmentType(data.establishmentType);
+    };
+    
     socket.on('newOrderReceived', handleNewOrder);
+    socket.on('newOrderSubmitted', handleNewOrder);
     socket.on('orderStatusUpdated', handleStatusUpdated);
     socket.on('adminStateSynced', handleAdminSync);
+    socket.on('operationalModeChanged', handleModeChange);
+    socket.on('modeToggled', handleModeChange);
+    socket.on('establishmentSettingsChanged', handleSettingsChange);
 
     return () => {
       socket.off('newOrderReceived', handleNewOrder);
+      socket.off('newOrderSubmitted', handleNewOrder);
       socket.off('orderStatusUpdated', handleStatusUpdated);
       socket.off('adminStateSynced', handleAdminSync);
+      socket.off('operationalModeChanged', handleModeChange);
+      socket.off('modeToggled', handleModeChange);
+      socket.off('establishmentSettingsChanged', handleSettingsChange);
     };
   }, [socket, isConnected, restaurantId, authToken]);
 
@@ -332,21 +342,28 @@ export default function KitchenPage() {
                 
                 const isNew = ticket.status === 'NEW';
                 const isPreparing = ticket.status === 'PREPARING';
+                const isPaymentPending = ticket.status === 'PAYMENT_PENDING';
                 
                 let borderColor = 'border-slate-800';
                 let shadowColor = 'shadow-none';
-                if (isDelayed) { borderColor = 'border-rose-500'; shadowColor = 'shadow-[0_0_20px_rgba(244,63,94,0.3)] animate-pulse'; }
+                if (isPaymentPending) { borderColor = 'border-indigo-500'; shadowColor = 'shadow-[0_0_20px_rgba(99,102,241,0.3)] animate-pulse'; }
+                else if (isDelayed) { borderColor = 'border-rose-500'; shadowColor = 'shadow-[0_0_20px_rgba(244,63,94,0.3)] animate-pulse'; }
                 else if (isPreparing) { borderColor = 'border-amber-400'; shadowColor = 'shadow-[0_0_15px_rgba(251,191,36,0.2)]'; }
-                else if (isNew) { borderColor = 'border-cyan-500/50'; shadowColor = 'shadow-[0_0_15px_rgba(34,211,238,0.1)]'; }
+                else if (isNew) { borderColor = 'border-cyan-500'; shadowColor = 'shadow-[0_0_15px_rgba(34,211,238,0.2)]'; }
 
                 return (
                   <div key={ticket.id} className={`bg-slate-900/80 backdrop-blur-md rounded-2xl border-2 ${borderColor} flex flex-col ${shadowColor} overflow-hidden transition-all`}>
                     
                     {/* Ticket Header */}
-                    <div className={`p-4 flex justify-between items-start border-b border-slate-800 ${isPreparing ? 'bg-amber-400/5' : isDelayed ? 'bg-rose-500/5' : 'bg-cyan-500/5'}`}>
-                       <div>
+                    <div className={`p-4 flex justify-between items-start border-b border-slate-800 ${isPaymentPending ? 'bg-indigo-500/10' : isPreparing ? 'bg-amber-400/5' : isDelayed ? 'bg-rose-500/5' : 'bg-cyan-500/5'}`}>
+                       <div className="flex-1">
+                         {establishmentType === 'HOTEL' && ticket.guestClaim && (
+                           <div className="bg-rose-600 text-white font-black p-2 text-center uppercase tracking-widest animate-pulse mb-3 rounded shadow-[0_0_15px_rgba(225,29,72,0.6)]">
+                             GUEST CLAIM: {ticket.guestClaim.name}, RM {ticket.guestClaim.room}
+                           </div>
+                         )}
                          <h3 className="text-3xl font-black tracking-tighter text-white leading-none drop-shadow-md">
-                           TBL {ticket.tableNumber}
+                           {establishmentType === 'HOTEL' ? 'RM' : 'TBL'} {ticket.tableNumber}
                          </h3>
                          <span className="inline-block mt-2 font-black text-cyan-400/70 tracking-[0.2em] text-xs bg-cyan-950/50 border border-cyan-900 px-2 py-1 rounded">
                            ID:{ticket.id.slice(-6).toUpperCase()}
@@ -387,6 +404,20 @@ export default function KitchenPage() {
 
                     {/* Ticket Footer Action */}
                     <div className="p-3 bg-slate-900/90 border-t border-slate-800 backdrop-blur-md">
+                      {ticket.status === 'PAYMENT_PENDING' && (
+                        <div className="space-y-2">
+                          <div className="bg-indigo-900/40 border border-indigo-500/50 text-indigo-300 px-3 py-2 rounded-lg text-center font-bold text-sm uppercase tracking-widest animate-pulse">
+                            Verify: {ticket.paymentMethod === 'UPI' ? 'UPI' : 'CASH/CARD'} ₹{ticket.totalAmount || '0.00'}
+                          </div>
+                          <button 
+                            onClick={() => updateOrderStatus(ticket.id, 'NEW')}
+                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-lg py-4 rounded-xl active:scale-95 transition-all tracking-widest shadow-md"
+                          >
+                            CONFIRM PAYMENT & COOK
+                          </button>
+                        </div>
+                      )}
+
                       {ticket.status === 'NEW' && (
                         <button 
                           onClick={() => updateOrderStatus(ticket.id, 'PREPARING')}

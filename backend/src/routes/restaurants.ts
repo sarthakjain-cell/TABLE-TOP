@@ -12,6 +12,13 @@ interface UpdateModeBody {
   mode: 'FULL_SERVICE' | 'SELF_SERVICE';
 }
 
+interface UpdateSettingsBody {
+  establishmentType: 'RESTAURANT' | 'HOTEL';
+  roomServiceFee?: number;
+  upiId?: string;
+  merchantName?: string;
+}
+
 export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Create a new restaurant
   fastify.post<{ Body: RestaurantBody }>('/api/restaurants', async (request, reply) => {
@@ -50,7 +57,22 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
       const restaurant = await prisma.restaurant.findUnique({
         where: { id },
         include: {
-          tables: true,
+          tables: {
+            include: {
+              sessions: {
+                where: { status: 'ACTIVE' },
+                include: {
+                  orders: {
+                    include: {
+                      items: {
+                        include: { menuItem: true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
       });
       
@@ -119,6 +141,52 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to update operational mode' });
+    }
+  });
+
+  // Update Settings (Establishment Type & Delivery Fee)
+  fastify.patch<{ Params: { id: string }; Body: UpdateSettingsBody }>('/api/restaurants/:id/settings', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+    const { id } = request.params;
+    const { establishmentType, roomServiceFee, upiId, merchantName } = request.body;
+
+    if (request.user!.restaurantId !== id) {
+      return reply.code(403).send({ error: 'Forbidden: Cannot update settings for a different restaurant' });
+    }
+
+    if (establishmentType !== 'RESTAURANT' && establishmentType !== 'HOTEL') {
+      return reply.code(400).send({ error: 'Invalid establishment type' });
+    }
+
+    try {
+      const data: any = { establishmentType };
+      if (roomServiceFee !== undefined) {
+        data.roomServiceFee = roomServiceFee;
+      }
+      if (upiId !== undefined) {
+        data.upiId = upiId;
+      }
+      if (merchantName !== undefined) {
+        data.merchantName = merchantName;
+      }
+
+      const updatedRestaurant = await prisma.restaurant.update({
+        where: { id },
+        data,
+      });
+
+      const io = getIO();
+      io.emit('establishmentSettingsChanged', { 
+        restaurantId: id, 
+        establishmentType,
+        roomServiceFee: updatedRestaurant.roomServiceFee,
+        upiId: updatedRestaurant.upiId,
+        merchantName: updatedRestaurant.merchantName
+      });
+
+      return updatedRestaurant;
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to update settings' });
     }
   });
 };

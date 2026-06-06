@@ -11,6 +11,7 @@ import { orderRoutes } from './routes/orders';
 import { billingRoutes } from './routes/billing';
 import { webhookRoutes } from './routes/webhook';
 import { authRoutes } from './routes/auth';
+import { financeRoutes } from './routes/finance';
 import uploadRoutes from './routes/upload';
 import fastifyMultipart from '@fastify/multipart';
 
@@ -49,6 +50,7 @@ fastify.register(orderRoutes);
 fastify.register(billingRoutes);
 fastify.register(webhookRoutes);
 fastify.register(authRoutes);
+fastify.register(financeRoutes);
 fastify.register(uploadRoutes);
 
 // Health Check Endpoint
