@@ -58,15 +58,15 @@ interface SocketContextType {
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 const getSocketUrl = () => {
-  if (typeof window !== 'undefined') {
-    // If accessed from a mobile phone / local network IP, override env and connect to that IP at port 3001
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (!isLocalhost) {
-      return `${window.location.protocol}//${window.location.hostname}:3001`;
-    }
-    return process.env.NEXT_PUBLIC_API_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:3001`;
+  }
+  
+  return 'http://localhost:3001';
 };
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
