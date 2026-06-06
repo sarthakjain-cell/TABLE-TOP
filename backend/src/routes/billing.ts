@@ -14,6 +14,11 @@ interface PaySplitBody {
   items: SplitPaymentItem[];
 }
 
+interface CheckoutCartBody {
+  customerName?: string;
+  customerPhone?: string;
+}
+
 export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Get billing status for a session (subtotals, taxes, paid items, outstanding items)
   fastify.get<{ Params: { sessionId: string } }>('/api/sessions/:sessionId/billing-status', async (request, reply) => {
@@ -143,7 +148,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   // Pay for a custom split selection of items from the shared cart
   fastify.post<{ Params: { sessionId: string }; Body: PaySplitBody }>('/api/sessions/:sessionId/pay-split', async (request, reply) => {
     const { sessionId } = request.params;
-    const { items, customerName, customerPhone } = request.body;
+    const { items, customerName, customerPhone, paymentMethod } = request.body;
 
     if (!items || !items.length) {
       return reply.code(400).send({ error: 'Selected items list cannot be empty' });
@@ -292,9 +297,24 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           });
         }
 
+        if (paymentMethod) {
+          const affectedOrderIds = new Set<string>();
+          for (const item of transactionItemsPayload) {
+            const orderItem = orderedItemsMap.get(item.orderItemId);
+            if (orderItem) affectedOrderIds.add(orderItem.orderId);
+          }
+          await tx.order.updateMany({
+            where: { id: { in: Array.from(affectedOrderIds) } },
+            data: { paymentMethod }
+          });
+        }
+
         return {
           createdTx,
-          isFullyPaid
+          isFullyPaid,
+          affectedOrderIds: paymentMethod ? Array.from(
+            new Set(transactionItemsPayload.map(i => orderedItemsMap.get(i.orderItemId)?.orderId).filter(Boolean))
+          ) : []
         };
       });
 
@@ -311,6 +331,24 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         });
       }
 
+      // Re-fetch affected orders to broadcast the updated paymentMethod to the Kitchen
+      if (paymentMethod && transaction.affectedOrderIds.length > 0) {
+        const io = getIO();
+        for (const orderId of transaction.affectedOrderIds) {
+          const updatedOrder = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { items: { include: { menuItem: true } } }
+          });
+          if (updatedOrder) {
+             io.emit('orderStatusUpdated', {
+                orderId: updatedOrder.id,
+                status: updatedOrder.status,
+                paymentMethod: updatedOrder.paymentMethod
+             });
+          }
+        }
+      }
+
       return {
         transaction: transaction.createdTx,
         sessionFullyPaid: transaction.isFullyPaid,
@@ -321,6 +359,250 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to process split payment' });
+    }
+  });
+
+  // Hotel Mode Cart Checkout (processes payment, applies delivery fee, and transitions PENDING cart to NEW order)
+  fastify.post<{ Params: { sessionId: string }; Body: CheckoutCartBody }>('/api/sessions/:sessionId/checkout-cart', async (request, reply) => {
+    const { sessionId } = request.params;
+    const { customerName, customerPhone } = request.body;
+
+    try {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        include: {
+          table: { include: { restaurant: true } }
+        }
+      });
+
+      if (!session || session.status === 'CLOSED') {
+        return reply.code(400).send({ error: 'Invalid or closed session' });
+      }
+
+      const isHotel = session.table.restaurant.establishmentType === 'HOTEL';
+      const roomServiceFee = isHotel ? new Decimal(session.table.restaurant.roomServiceFee.toString()) : new Decimal(0);
+      const taxRate = new Decimal(session.table.restaurant.taxRate.toString());
+
+      const result = await prisma.$transaction(async (tx) => {
+        const pendingOrder = await tx.order.findFirst({
+          where: { sessionId, status: 'PENDING' },
+          include: {
+            items: { include: { menuItem: true } }
+          }
+        });
+
+        if (!pendingOrder || pendingOrder.items.length === 0) {
+          throw new Error('Your cart is empty');
+        }
+
+        let transactionSubtotal = new Decimal(0);
+        let transactionTax = new Decimal(0);
+        const transactionItemsPayload: any[] = [];
+
+        // Verify availability and calculate costs
+        for (const item of pendingOrder.items) {
+          if (!item.menuItem.isAvailable) {
+            throw new Error(`"${item.menuItem.name}" is no longer available`);
+          }
+          const price = new Decimal(item.price.toString());
+          const qty = new Decimal(item.quantity.toString());
+          const subtotal = price.mul(qty);
+          const taxFraction = subtotal.mul(taxRate).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+
+          transactionSubtotal = transactionSubtotal.add(subtotal);
+          transactionTax = transactionTax.add(taxFraction);
+
+          transactionItemsPayload.push({
+            orderItemId: item.id,
+            quantityPaid: qty,
+            amount: subtotal,
+            taxFraction
+          });
+        }
+
+        const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+        // Transition order state from PENDING to NEW
+        const updatedOrder = await tx.order.update({
+          where: { id: pendingOrder.id },
+          data: { status: 'NEW' },
+          include: {
+            items: { include: { menuItem: true } }
+          }
+        });
+
+        // Create transaction with delivery fee applied
+        const createdTx = await tx.transaction.create({
+          data: {
+            sessionId,
+            amount: totalGrand,
+            taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+            status: 'COMPLETED',
+            customerName,
+            customerPhone,
+            deliveryFeeApplied: roomServiceFee,
+            paymentItems: {
+              create: transactionItemsPayload
+            }
+          }
+        });
+
+        return { updatedOrder, createdTx };
+      });
+
+      const io = getIO();
+      const sessionRoom = `session:${sessionId}`;
+
+      // Broadcast empty cart and order state
+      io.to(sessionRoom).emit('cartUpdated', { sessionId, cart: { items: [], subtotal: '0.00' } });
+      io.to(sessionRoom).emit('orderStatusUpdated', { orderId: result.updatedOrder.id, status: 'NEW' });
+
+      // Notify Kitchen line about the new incoming ticket WITH guest claim since it was paid upfront
+      io.emit('newOrderSubmitted', {
+        order: {
+          id: result.updatedOrder.id,
+          status: 'NEW',
+        tableNumber: session.table.number,
+        restaurantId: session.restaurantId,
+        items: result.updatedOrder.items.map(i => ({
+          name: i.menuItem.name,
+          quantity: new Decimal(i.quantity.toString()).toNumber(),
+          modifications: i.modifications
+        })),
+        createdAt: result.updatedOrder.createdAt,
+        guestClaim: customerName || customerPhone ? {
+          name: customerName || '',
+          room: customerPhone || session.table.number
+        } : undefined
+        }
+      });
+
+      return reply.code(200).send({ success: true, transaction: result.createdTx });
+    } catch (error: any) {
+      fastify.log.error(error);
+      return reply.code(400).send({ error: error.message || 'Failed to checkout cart' });
+    }
+  });
+
+  interface CheckoutDirectBody {
+    paymentMethod: 'UPI' | 'CASH';
+    customerName?: string;
+    customerPhone?: string;
+  }
+
+  // Direct checkout (Zero-Fee UPI or Cash to Waiter)
+  fastify.post<{ Params: { sessionId: string }; Body: CheckoutDirectBody }>('/api/sessions/:sessionId/checkout-direct', async (request, reply) => {
+    const { sessionId } = request.params;
+    const { paymentMethod, customerName, customerPhone } = request.body;
+
+    if (paymentMethod !== 'UPI' && paymentMethod !== 'CASH') {
+      return reply.code(400).send({ error: 'Invalid payment method' });
+    }
+
+    try {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        include: { table: { include: { restaurant: true } } }
+      });
+
+      if (!session) throw new Error('Session not found');
+
+      const taxRate = new Decimal(session.table.restaurant.taxRate.toString());
+      const isHotel = session.table.restaurant.establishmentType === 'HOTEL';
+      const roomServiceFee = isHotel ? new Decimal(session.table.restaurant.roomServiceFee.toString()) : new Decimal(0);
+
+      const result = await prisma.$transaction(async (tx) => {
+        const pendingOrder = await tx.order.findFirst({
+          where: { sessionId, status: 'PENDING' },
+          include: { items: { include: { menuItem: true } } }
+        });
+
+        if (!pendingOrder || pendingOrder.items.length === 0) {
+          throw new Error('Your cart is empty');
+        }
+
+        let transactionSubtotal = new Decimal(0);
+        let transactionTax = new Decimal(0);
+        const transactionItemsPayload: any[] = [];
+
+        for (const item of pendingOrder.items) {
+          if (!item.menuItem.isAvailable) {
+            throw new Error(`"${item.menuItem.name}" is no longer available`);
+          }
+          const price = new Decimal(item.price.toString());
+          const qty = new Decimal(item.quantity.toString());
+          const subtotal = price.mul(qty);
+          const taxFraction = subtotal.mul(taxRate).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+
+          transactionSubtotal = transactionSubtotal.add(subtotal);
+          transactionTax = transactionTax.add(taxFraction);
+
+          transactionItemsPayload.push({
+            orderItemId: item.id,
+            quantityPaid: qty,
+            amount: subtotal,
+            taxFraction
+          });
+        }
+
+        const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+        // Transition order state to PAYMENT_PENDING
+        const updatedOrder = await tx.order.update({
+          where: { id: pendingOrder.id },
+          data: { 
+            status: 'PAYMENT_PENDING',
+            paymentMethod: paymentMethod 
+          },
+          include: { items: { include: { menuItem: true } } }
+        });
+
+        // Create transaction as PENDING. It will be COMPLETED when kitchen verifies.
+        const createdTx = await tx.transaction.create({
+          data: {
+            sessionId,
+            amount: totalGrand,
+            taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+            status: 'PENDING',
+            customerName,
+            customerPhone,
+            deliveryFeeApplied: roomServiceFee,
+            paymentItems: {
+              create: transactionItemsPayload
+            }
+          }
+        });
+
+        return { updatedOrder, createdTx };
+      });
+
+      const io = getIO();
+      const sessionRoom = `session:${sessionId}`;
+
+      io.to(sessionRoom).emit('cartUpdated', { sessionId, cart: { items: [], subtotal: '0.00' } });
+      io.to(sessionRoom).emit('orderStatusUpdated', { orderId: result.updatedOrder.id, status: 'PAYMENT_PENDING', paymentMethod: paymentMethod });
+
+      io.emit('newOrderReceived', {
+        order: {
+          id: result.updatedOrder.id,
+          status: 'PAYMENT_PENDING',
+          tableNumber: session.table.number,
+          restaurantId: session.restaurantId,
+          paymentMethod: paymentMethod,
+          items: result.updatedOrder.items.map(i => ({
+            name: i.menuItem.name,
+            quantity: new Decimal(i.quantity.toString()).toNumber(),
+            modifications: i.modifications
+          })),
+          createdAt: result.updatedOrder.createdAt,
+          totalAmount: result.createdTx.amount.toString() // We pass the totalAmount here for KDS display
+        }
+      });
+
+      return reply.code(200).send({ success: true, transaction: result.createdTx });
+    } catch (error: any) {
+      fastify.log.error(error);
+      return reply.code(400).send({ error: error.message || 'Failed to checkout directly' });
     }
   });
 };

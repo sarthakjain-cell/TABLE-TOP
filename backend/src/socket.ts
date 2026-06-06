@@ -13,14 +13,21 @@ export interface ServerToClientEvents {
     status: string;
     tableNumber?: string;
     restaurantId?: string;
+    paymentMethod?: string;
+    totalAmount?: string;
     items?: Array<{ name: string; quantity: number; modifications: string[] }>;
     createdAt?: Date;
+    guestClaim?: { name: string; room: string };
   }) => void;
   helpRequested: (data: { tableNumber: string; requestType: string }) => void;
   pickupReady: (data: { orderId: string; tableNumber: string }) => void;
   menuItemAvailabilityChanged: (data: { menuItemId: string; isAvailable: boolean }) => void;
   sessionSynced: (data: any) => void; // Exclusive synchronization payload on reconnect
   error: (data: { message: string }) => void;
+  menuUpdated: (data: { restaurantId: string }) => void;
+  establishmentSettingsChanged: (data: any) => void;
+  newOrderReceived: (data: { order: any }) => void;
+  newOrderSubmitted: (data: { order: any }) => void;
 }
 
 export interface ClientToServerEvents {

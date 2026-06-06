@@ -16,7 +16,7 @@ interface CreateOrderBody {
 }
 
 interface UpdateStatusBody {
-  status: 'NEW' | 'PREPARING' | 'READY_TO_SERVE' | 'COMPLETED';
+  status: 'PAYMENT_PENDING' | 'NEW' | 'PREPARING' | 'READY_TO_SERVE' | 'COMPLETED';
 }
 
 export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -120,13 +120,19 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
             status: 'ACTIVE'
           },
           status: {
-            in: ['NEW', 'PREPARING', 'READY_TO_SERVE']
+            in: ['PAYMENT_PENDING', 'NEW', 'PREPARING', 'READY_TO_SERVE']
           }
         },
         include: {
           session: {
             include: {
-              table: true
+              table: true,
+              transactions: {
+                orderBy: {
+                  createdAt: 'desc'
+                },
+                take: 1
+              }
             }
           },
           items: {
@@ -145,13 +151,19 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         id: order.id,
         tableNumber: order.session.table.number,
         status: order.status,
+        paymentMethod: order.paymentMethod,
+        totalAmount: order.session.transactions.length > 0 ? order.session.transactions[0].amount.toString() : undefined,
         createdAt: order.createdAt,
         items: order.items.map(item => ({
           id: item.id,
           name: item.menuItem.name,
           quantity: new Decimal(item.quantity.toString()).toNumber(),
           modifications: item.modifications
-        }))
+        })),
+        guestClaim: order.session.transactions.length > 0 && (order.session.transactions[0].customerName || order.session.transactions[0].customerPhone) ? {
+          name: order.session.transactions[0].customerName || '',
+          room: order.session.transactions[0].customerPhone || order.session.table.number
+        } : undefined
       }));
 
       return kitchenTickets;
@@ -160,6 +172,10 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       return reply.code(500).send({ error: 'Failed to fetch active kitchen tickets' });
     }
   });
+
+  interface UpdateStatusBody {
+    status: 'PAYMENT_PENDING' | 'NEW' | 'PREPARING' | 'READY_TO_SERVE' | 'COMPLETED';
+  }
 
   // Update order status (Kitchen Line interactions)
   fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/orders/:id/status', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
@@ -201,6 +217,19 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
           }
         }
       });
+
+      // If the order was PAYMENT_PENDING and is now transitioning forward, finalize its PENDING transaction
+      if (order.status === 'PAYMENT_PENDING' && status !== 'PAYMENT_PENDING') {
+        const pendingTx = await prisma.transaction.findFirst({
+          where: { sessionId: order.sessionId, status: 'PENDING' }
+        });
+        if (pendingTx) {
+          await prisma.transaction.update({
+            where: { id: pendingTx.id },
+            data: { status: 'COMPLETED' }
+          });
+        }
+      }
 
       const io = getIO();
       const sessionRoom = `session:${order.sessionId}`;

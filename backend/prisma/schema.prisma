@@ -12,6 +12,11 @@ enum OperationalMode {
   SELF_SERVICE
 }
 
+enum EstablishmentType {
+  RESTAURANT
+  HOTEL
+}
+
 enum TableStatus {
   VACANT
   OCCUPIED
@@ -24,6 +29,7 @@ enum SessionStatus {
 
 enum OrderStatus {
   PENDING      // Collaborative active cart status
+  PAYMENT_PENDING // Direct Checkout Verification
   NEW          // Submitted to kitchen
   PREPARING
   READY_TO_SERVE
@@ -39,14 +45,18 @@ enum TransactionStatus {
 
 model Restaurant {
   id              String          @id @default(uuid())
-  name            String
-  passcodeHash    String?
-  operationalMode OperationalMode @default(FULL_SERVICE)
-  taxRate         Decimal         @db.Decimal(5, 4) // e.g. 0.0825 for 8.25%
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  tables          Table[]
-  menuItems       MenuItem[]
+  name              String
+  passcodeHash      String?
+  operationalMode   OperationalMode   @default(FULL_SERVICE)
+  establishmentType EstablishmentType @default(RESTAURANT)
+  roomServiceFee    Decimal           @default(0.00) @db.Decimal(10, 2)
+  taxRate           Decimal           @db.Decimal(5, 4) // e.g. 0.0825 for 8.25%
+  upiId             String?
+  merchantName      String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tables            Table[]
+  menuItems         MenuItem[]
 }
 
 model Table {
@@ -93,13 +103,14 @@ model MenuItem {
 }
 
 model Order {
-  id        String      @id @default(uuid())
-  sessionId String
-  session   Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  status    OrderStatus @default(PENDING)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  items     OrderItem[]
+  id            String      @id @default(uuid())
+  sessionId     String
+  session       Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  status        OrderStatus @default(PENDING)
+  paymentMethod String?
+  items         OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model OrderItem {
@@ -122,11 +133,12 @@ model Transaction {
   amount        Decimal            @db.Decimal(10, 2)
   taxPaid       Decimal            @db.Decimal(10, 2)
   status        TransactionStatus  @default(PENDING)
-  customerName  String?            // Metadata tracking for split billing
-  customerPhone String?            // Metadata tracking for split billing
-  paymentItems  OrderItemPayment[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  customerName       String?            // Metadata tracking for split billing
+  customerPhone      String?            // Metadata tracking for split billing
+  deliveryFeeApplied Decimal            @db.Decimal(10, 2) @default(0.00)
+  paymentItems       OrderItemPayment[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 }
 
 model OrderItemPayment {

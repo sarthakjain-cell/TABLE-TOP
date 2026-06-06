@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface MenuItem {
   id: string;
@@ -11,6 +12,7 @@ interface MenuItem {
   price: string;
   halfPrice?: string | null;
   hasHalfPortion?: boolean;
+  category?: string;
   isAvailable: boolean;
   imageUrl?: string;
 }
@@ -30,7 +32,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'menu' | 'cart' | 'orders' | 'billing'>('menu');
-  const [checkoutMode, setCheckoutMode] = useState<'IDLE' | 'CHOICE' | 'PAY_FULL' | 'SPLIT'>('IDLE');
+  const [checkoutMode, setCheckoutMode] = useState<'IDLE' | 'CHOICE' | 'PAY_FULL' | 'SPLIT' | 'CHARGE_ROOM'>('IDLE');
   const [showBellModal, setShowBellModal] = useState(false);
   const [showPickupAlert, setShowPickupAlert] = useState(false);
   
@@ -43,6 +45,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [activeCategory, setActiveCategory] = useState('All');
   const imageCacheBuster = useRef(Date.now());
   const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category || 'Main Course')))];
+
+  const [showUpiOptions, setShowUpiOptions] = useState(false);
 
   // 1. Verify token & join table room on mount
   useEffect(() => {
@@ -147,42 +151,80 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     return items;
   };
 
-  const grandTotal = parseFloat(tableSession?.billing?.remaining?.grandTotal || '0');
+  const isHotel = restaurant?.establishmentType === 'HOTEL';
+  const roomServiceFee = isHotel ? parseFloat(restaurant?.roomServiceFee || '0') : 0;
+  
+  const subtotalGrand = parseFloat(tableSession?.billing?.remaining?.grandTotal || '0');
+  const cartSubtotal = parseFloat(tableSession?.cart?.subtotal || '0');
+  const isCartCheckout = isHotel && cartSubtotal > 0 && subtotalGrand === 0;
+  
+  const grandTotal = isCartCheckout 
+    ? cartSubtotal + roomServiceFee 
+    : (subtotalGrand > 0 ? subtotalGrand + roomServiceFee : 0);
+  
   const totalAllocated = contributors.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
   const remaining = grandTotal - totalAllocated;
 
-  const executeCheckout = async () => {
-    const payloadItems = getFullUnpaidItemsPayload();
-    if (payloadItems.length === 0) return;
-    
+  const executeCheckout = async (paymentMethod?: 'UPI' | 'CASH' | 'ROOM') => {
     setPaymentProcessing(true);
 
     try {
-      const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-split`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          items: payloadItems
-        })
-      });
+      if (isCartCheckout || checkoutMode === 'CHARGE_ROOM') {
+        // Hotel cart checkout (pre-payment before kitchen submission)
+        const response = await fetch(`/api/sessions/${tableSession.sessionId}/checkout-cart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerName, customerPhone })
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Cart checkout failed');
+        }
+      } else {
+        // Standard split payment for existing orders
+        const payloadItems = getFullUnpaidItemsPayload();
+        if (payloadItems.length === 0) {
+          setPaymentProcessing(false);
+          return;
+        }
+        
+        const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-split`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerName,
+            customerPhone,
+            paymentMethod,
+            items: payloadItems
+          })
+        });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Payment failed');
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Payment failed');
+        }
       }
 
       setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
       setPaymentSuccess(true);
+      setShowUpiOptions(false);
+      setCheckoutMode('IDLE');
       setTimeout(() => setPaymentSuccess(false), 5000);
-      setActiveTab('menu');
+      setActiveTab('orders');
     } catch (err: any) {
       alert(err.message || 'Payment execution failed');
     } finally {
       setPaymentProcessing(false);
     }
   };
+
+  const cartSubtotalCalc = parseFloat(tableSession?.cart?.subtotal || '0');
+  const calculatedTax = parseFloat(decimalMath.calculateTax(cartSubtotalCalc, restaurant?.taxRate || 0));
+  const checkoutGrandTotal = parseFloat(decimalMath.add(cartSubtotalCalc, calculatedTax));
+  
+  const encodedMerchantName = encodeURIComponent(restaurant?.merchantName || '');
+  const encodedUpiId = encodeURIComponent(restaurant?.upiId || '');
+  const upiString = `upi://pay?pa=${encodedUpiId}&pn=${encodedMerchantName}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Session_${tableSession?.sessionId}`;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative shadow-2xl pb-24">
@@ -191,14 +233,14 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-800">{restaurant?.name || 'Table Top'}</h1>
-            <p className="text-xs text-gray-500 font-medium">Table Number: {tableSession.tableNumber}</p>
+            <p className="text-xs text-gray-500 font-medium">{isHotel ? 'Room' : 'Table'} Number: {tableSession.tableNumber}</p>
           </div>
           {tableSession.restaurantMode === 'FULL_SERVICE' ? (
             <button
               onClick={() => setShowBellModal(true)}
               className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-sm font-semibold active:bg-indigo-100 flex items-center gap-1 border border-indigo-100 shadow-sm"
             >
-              🔔 Call Waiter
+              🔔 {isHotel ? 'Room Service' : 'Call Waiter'}
             </button>
           ) : (
             <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold animate-pulse">
@@ -406,15 +448,26 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    submitCart();
-                    setActiveTab('orders');
-                  }}
-                  className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-indigo-700 active:scale-[0.99] transition mt-6"
-                >
-                  🚀 Submit Order to Kitchen
-                </button>
+                {isHotel ? (
+                  <button
+                    onClick={() => {
+                      setCheckoutMode('CHARGE_ROOM');
+                    }}
+                    className="w-full bg-purple-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-purple-700 active:scale-[0.99] transition mt-6"
+                  >
+                    🛎️ Proceed to Checkout
+                  </button>
+                ) : (
+                  <div className="mt-6 space-y-3">
+                    <button
+                      onClick={submitCart}
+                      disabled={paymentProcessing}
+                      className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-emerald-700 active:scale-[0.99] transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      🍳 Place Order
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -512,7 +565,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             )}
 
             {checkoutMode === 'PAY_FULL' && (
-              <div className="animate-fade-in space-y-6">
+              <div className="animate-fade-in space-y-6 pb-8">
                 <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
                   <span>💳</span> Full Checkout
                 </h2>
@@ -521,7 +574,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                      <span className="text-6xl">💰</span>
                    </div>
                    <p className="text-blue-800 font-bold mb-2 uppercase tracking-widest text-xs relative z-10">Total Remaining Balance</p>
-                   <p className="text-6xl font-black text-blue-600 tabular-nums tracking-tighter relative z-10">${tableSession?.billing?.remaining?.grandTotal || '0.00'}</p>
+                   <p className="text-6xl font-black text-blue-600 tabular-nums tracking-tighter relative z-10">₹{tableSession?.billing?.remaining?.grandTotal || '0.00'}</p>
                 </div>
                 
                 <div className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-sm space-y-4">
@@ -533,16 +586,68 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     type="tel" placeholder="Your Phone Number" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
                     className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 font-bold text-gray-900 placeholder-gray-400"
                   />
-                  <button
-                    onClick={executeCheckout}
-                    disabled={paymentProcessing || !customerName}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-emerald-500/30 disabled:opacity-50 mt-2 text-lg tracking-tight"
-                  >
-                    {paymentProcessing ? 'Processing...' : 'Submit Payment'}
-                  </button>
+                  
+                  {!showUpiOptions ? (
+                    <>
+                      <button
+                        onClick={() => setShowUpiOptions(true)}
+                        disabled={!customerName}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-indigo-600/30 disabled:opacity-50 mt-2 text-lg tracking-tight flex items-center justify-center gap-2"
+                      >
+                        💸 Pay via UPI
+                      </button>
+                      <button
+                        onClick={() => executeCheckout('CASH')}
+                        disabled={!customerName}
+                        className="w-full bg-white text-gray-700 border-2 border-gray-200 font-black py-5 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition-transform disabled:opacity-50 text-lg tracking-tight flex items-center justify-center gap-2"
+                      >
+                        💵 Pay Cash / Card to Waiter
+                      </button>
+                    </>
+                  ) : (
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center animate-fade-in space-y-6 mt-4">
+                      <div className="text-center">
+                        <h3 className="font-extrabold text-gray-900 text-lg">Scan to Pay</h3>
+                        <p className="text-gray-500 text-sm font-medium mt-1">₹{grandTotal.toFixed(2)} to {restaurant?.merchantName}</p>
+                      </div>
+                      
+                      <div className="p-2 bg-white rounded-xl border-4 border-indigo-100 shadow-inner">
+                        <QRCodeSVG
+                          value={upiString}
+                          size={200}
+                          level="H"
+                          includeMargin={false}
+                        />
+                      </div>
+                      
+                      <div className="w-full space-y-3">
+                         <a 
+                           href={upiString}
+                           className="w-full bg-indigo-50 text-indigo-700 border-2 border-indigo-200 font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-100 active:scale-[0.99] transition"
+                         >
+                           Pay via GPay / PhonePe / Paytm
+                         </a>
+                         
+                         <button
+                           onClick={() => executeCheckout('UPI')}
+                           className="w-full bg-emerald-600 text-white font-extrabold py-3.5 rounded-xl shadow-md hover:bg-emerald-700 active:scale-[0.99] transition flex items-center justify-center gap-2"
+                         >
+                           ✅ I Have Paid
+                         </button>
+                         
+                         <button
+                           onClick={() => setShowUpiOptions(false)}
+                           className="w-full text-gray-500 font-semibold py-2 text-sm hover:text-gray-700 transition"
+                         >
+                           Back to payment options
+                         </button>
+                      </div>
+                    </div>
+                  )}
+
                   <button 
                     onClick={() => setCheckoutMode('CHOICE')} 
-                    className="w-full py-4 text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors"
+                    className="w-full py-4 text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors mt-4"
                   >
                     Change Payment Method
                   </button>
@@ -635,12 +740,53 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 </div>
 
                 <button
-                  onClick={executeCheckout}
+                  onClick={() => executeCheckout('CASH')}
                   disabled={paymentProcessing || remaining !== 0}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white font-black py-5 rounded-2xl shadow-lg shadow-emerald-500/30 disabled:opacity-50 mt-4 text-lg tracking-tight"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-emerald-500/30 disabled:opacity-50 mt-4 text-lg tracking-tight"
                 >
-                  {paymentProcessing ? 'Processing Payment...' : 'Proceed to Payment'}
+                  {paymentProcessing ? 'Processing...' : 'Submit Split Payments to Waiter'}
                 </button>
+              </div>
+            )}
+
+            {checkoutMode === 'CHARGE_ROOM' && (
+              <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6">
+                  <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2 text-center justify-center">
+                    <span>🛎️</span> Charge to Room
+                  </h2>
+                  <div className="bg-purple-50 border border-purple-100 rounded-[2rem] p-8 shadow-sm text-center relative overflow-hidden">
+                     <div className="absolute top-0 right-0 p-4 opacity-10">
+                       <span className="text-6xl">🏨</span>
+                     </div>
+                     <p className="text-purple-800 font-bold mb-2 uppercase tracking-widest text-xs relative z-10">Total Bill</p>
+                     <p className="text-6xl font-black text-purple-600 tabular-nums tracking-tighter relative z-10">${grandTotal.toFixed(2)}</p>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-sm space-y-4">
+                    <input
+                      type="text" placeholder="Last Name on Reservation" value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600 font-bold text-gray-900 placeholder-gray-400"
+                    />
+                    <input
+                      type="text" placeholder="Room Number" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600 font-bold text-gray-900 placeholder-gray-400"
+                    />
+                    <button
+                      onClick={() => executeCheckout('ROOM')}
+                      disabled={paymentProcessing || !customerName || !customerPhone}
+                      className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-purple-600/30 disabled:opacity-50 mt-2 text-lg tracking-tight"
+                    >
+                      {paymentProcessing ? 'Processing...' : 'Confirm Order'}
+                    </button>
+                    <button 
+                      onClick={() => setCheckoutMode('IDLE')} 
+                      className="w-full py-4 text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors mt-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -653,7 +799,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           <div className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl border animate-scale-up">
             <h3 className="font-bold text-gray-800 text-center mb-4">Request Service</h3>
             <div className="grid grid-cols-2 gap-3">
-              {['Water', 'Cutlery', 'Service Refill', 'Ask for Bill'].map((req) => (
+              {(isHotel ? ['Clear Tray', 'Ice Bucket', 'Extra Cutlery', 'Bottled Water'] : ['Water', 'Cutlery', 'Service Refill', 'Ask for Bill']).map((req) => (
                 <button
                   key={req}
                   onClick={() => {
@@ -711,18 +857,20 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           <span className="text-xl">🚚</span>
           <span className="text-[10px]">Orders</span>
         </button>
-        <button
-          onClick={() => {
-            setActiveTab('billing');
-            if (checkoutMode === 'IDLE') setCheckoutMode('CHOICE');
-          }}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
-            activeTab === 'billing' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
-          }`}
-        >
-          <span className="text-xl">🧾</span>
-          <span className="text-[10px]">Checkout</span>
-        </button>
+        {!isHotel && (
+          <button
+            onClick={() => {
+              setActiveTab('billing');
+              if (checkoutMode === 'IDLE') setCheckoutMode('CHOICE');
+            }}
+            className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
+              activeTab === 'billing' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
+            }`}
+          >
+            <span className="text-xl">🧾</span>
+            <span className="text-[10px]">Checkout</span>
+          </button>
+        )}
       </nav>
     </div>
   );

@@ -5,13 +5,13 @@ import { useSocket } from '../../context/SocketContext';
 import { decimalMath } from '../../utils/decimalMath';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X } from 'lucide-react';
+import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
 
 interface OrderItem {
   id?: string;
   name: string;
   price: string;
-  orderedQuantity: number;
+  quantity: number;
 }
 
 interface Order {
@@ -62,11 +62,14 @@ export default function AdminPage() {
   const router = useRouter();
   const { isConnected, socket, authToken, setAuthToken } = useSocket();
   const [restaurantId, setRestaurantId] = useState<string>('');
-  const [restaurantName, setRestaurantName] = useState<string>('Table Top SaaS');
+  const [restaurantName, setRestaurantName] = useState('');
   const [allRestaurants, setAllRestaurants] = useState<{id: string, name: string}[]>([]);
-  const [taxRate, setTaxRate] = useState<string>('0.0825');
   const [operationalMode, setOperationalMode] = useState<'FULL_SERVICE' | 'SELF_SERVICE'>('FULL_SERVICE');
-  const [gstEstablishmentType, setGstEstablishmentType] = useState<'STANDALONE' | 'HOTEL'>('STANDALONE');
+  const [establishmentType, setEstablishmentType] = useState<'RESTAURANT' | 'HOTEL'>('RESTAURANT');
+  const [roomServiceFee, setRoomServiceFee] = useState<string>('0');
+  const [taxRate, setTaxRate] = useState<number>(0);
+  const [upiId, setUpiId] = useState('');
+  const [merchantName, setMerchantName] = useState('');
   
   const [tables, setTables] = useState<Table[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -74,7 +77,7 @@ export default function AdminPage() {
   const [ledgerFilterDate, setLedgerFilterDate] = useState<string>('');
   const [ledgerFilterMonth, setLedgerFilterMonth] = useState<string>('');
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger' | 'settings'>('dashboard');
   const [inputRestaurantId, setInputRestaurantId] = useState('');
   const [inputPasscode, setInputPasscode] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -251,9 +254,17 @@ export default function AdminPage() {
           if (!data.error) {
             setRestaurantName(data.name);
             setOperationalMode(data.operationalMode);
+            setEstablishmentType(data.establishmentType);
+            setRoomServiceFee(data.roomServiceFee?.toString() || '0.00');
             setTaxRate(data.taxRate);
+            setUpiId(data.upiId || '');
+            setMerchantName(data.merchantName || '');
             if (data.tables) {
-              const sorted = data.tables.sort((a: Table, b: Table) => Number(a.number) - Number(b.number));
+              const mapped = data.tables.map((t: any) => ({
+                ...t,
+                activeSession: t.sessions && t.sessions.length > 0 ? t.sessions[0] : undefined
+              }));
+              const sorted = mapped.sort((a: Table, b: Table) => Number(a.number) - Number(b.number));
               setTables(sorted);
             }
           } else {
@@ -326,6 +337,21 @@ export default function AdminPage() {
     }
   };
 
+  const savePaymentSettings = async () => {
+    try {
+      const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ establishmentType, upiId, merchantName })
+      });
+      if (!res.ok) throw new Error('Failed to save settings');
+      alert('Payment settings saved successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save payment settings');
+    }
+  };
+
   useEffect(() => {
     if (!socket || !isConnected) return;
     
@@ -334,15 +360,58 @@ export default function AdminPage() {
         setOperationalMode(data.mode);
       }
     };
+
+    const handleSettingsChange = (data: { restaurantId: string, establishmentType: 'RESTAURANT' | 'HOTEL', roomServiceFee: string }) => {
+      if (data.restaurantId === restaurantId) {
+        setEstablishmentType(data.establishmentType);
+        setRoomServiceFee(data.roomServiceFee?.toString() || '0.00');
+      }
+    };
     
     socket.on('operationalModeChanged', handleModeChange);
     socket.on('modeToggled', handleModeChange);
+    socket.on('establishmentSettingsChanged', handleSettingsChange);
     
     return () => {
       socket.off('operationalModeChanged', handleModeChange);
       socket.off('modeToggled', handleModeChange);
+      socket.off('establishmentSettingsChanged', handleSettingsChange);
     };
   }, [socket, isConnected, restaurantId]);
+
+  const toggleEstablishmentType = async () => {
+    const prevType = establishmentType;
+    const newType = establishmentType === 'RESTAURANT' ? 'HOTEL' : 'RESTAURANT';
+    setEstablishmentType(newType);
+    
+    try {
+      const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ establishmentType: newType })
+      });
+      
+      if (!res.ok) throw new Error('Failed to update settings');
+    } catch (err) {
+      console.error('Failed to update establishment type', err);
+      setEstablishmentType(prevType);
+      alert('Could not update Establishment Type.');
+    }
+  };
+
+  const saveRoomServiceFee = async (fee: string) => {
+    try {
+      const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ establishmentType, roomServiceFee: Number(fee) || 0 })
+      });
+      if (!res.ok) throw new Error('Failed to save fee');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save Room Service Fee.');
+    }
+  };
 
   const uploadToCloudinary = async (file: File, isEdit: boolean = false) => {
     setIsUploadingImage(true);
@@ -666,7 +735,7 @@ export default function AdminPage() {
               activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <LayoutDashboard size={18} /> Floor Plan
+            <LayoutDashboard size={18} /> {establishmentType === 'HOTEL' ? 'Room Management' : 'Floor Plan'}
           </button>
           <button
             onClick={() => setActiveTab('menu')}
@@ -683,6 +752,14 @@ export default function AdminPage() {
             }`}
           >
             <IndianRupee size={18} /> Financials
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'settings' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Settings size={18} /> Settings
           </button>
         </nav>
 
@@ -711,6 +788,25 @@ export default function AdminPage() {
               <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'FULL_SERVICE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Waitstaff</span>
               <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'SELF_SERVICE' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Self-Serve</span>
             </button>
+            <button 
+               className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
+               onClick={toggleEstablishmentType}
+            >
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'RESTAURANT' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Restaurant</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'HOTEL' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Hotel</span>
+            </button>
+            {establishmentType === 'HOTEL' && (
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-700 font-semibold bg-gray-100 px-3 py-1.5 rounded border border-gray-200">
+                <span>Fee: ₹</span>
+                <input 
+                  type="number" 
+                  value={roomServiceFee} 
+                  onChange={(e) => setRoomServiceFee(e.target.value)}
+                  onBlur={() => saveRoomServiceFee(roomServiceFee)}
+                  className="w-16 bg-white border border-gray-300 rounded px-1 outline-none focus:border-blue-500" 
+                />
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-6">
@@ -740,17 +836,17 @@ export default function AdminPage() {
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Floor Plan</h3>
-                  <p className="text-sm text-gray-500 mt-1">Live table status and operational view.</p>
+                  <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{establishmentType === 'HOTEL' ? 'Room Management' : 'Floor Plan'}</h3>
+                  <p className="text-sm text-gray-500 mt-1">Live {establishmentType === 'HOTEL' ? 'room' : 'table'} status and operational view.</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <form onSubmit={addTable} className="flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder="Table ID (e.g. 12)"
+                      placeholder={`${establishmentType === 'HOTEL' ? 'Room' : 'Table'} ID (e.g. 101)`}
                       value={newTableNumber}
                       onChange={(e) => setNewTableNumber(e.target.value)}
-                      className="w-36 bg-white border border-gray-300 text-gray-900 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      className="w-40 bg-white border border-gray-300 text-gray-900 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                       required
                     />
                     <button
@@ -758,7 +854,7 @@ export default function AdminPage() {
                       disabled={isAddingTable}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 disabled:opacity-50 shadow-sm"
                     >
-                      <Plus size={16} /> Add Table
+                      <Plus size={16} /> Add {establishmentType === 'HOTEL' ? 'Room' : 'Table'}
                     </button>
                   </form>
                 </div>
@@ -771,12 +867,35 @@ export default function AdminPage() {
                   const isNeedsClearing = table.status === 'NEEDS_CLEARING';
                   const isVacant = table.status === 'VACANT';
                   
-                  // In a real scenario, these properties come from the nested session object.
-                  // We simulate them strictly for the UI demonstration per the prompt instructions.
-                  // E.g., const elapsedMins = calculateElapsedMins(table.activeSession?.createdAt);
-                  const mockElapsed = isOccupied ? "45 mins" : null;
-                  const mockTotal = isOccupied ? "124.50" : null;
-                  const mockItems = isOccupied ? ["2x Wagyu Burger", "1x Truffle Fries", "2x Diet Coke"] : [];
+                  let realElapsed: string | null = null;
+                  let realTotal: string | null = null;
+                  let realItems: string[] = [];
+
+                  if (isOccupied && table.activeSession) {
+                    const diffMs = Date.now() - new Date(table.activeSession.createdAt).getTime();
+                    const diffMins = Math.floor(diffMs / 60000);
+                    realElapsed = `${diffMins} mins`;
+                    
+                    let subtotal = '0.00';
+                    table.activeSession.orders?.forEach((order: any) => {
+                      if (order.status !== 'COMPLETED') {
+                        order.items?.forEach((item: any) => {
+                          const itemTotal = decimalMath.multiply(item.price, item.quantity);
+                          subtotal = decimalMath.add(subtotal, itemTotal);
+                        });
+                      }
+                    });
+                    realTotal = subtotal;
+                    
+                    table.activeSession.orders?.forEach((order: any) => {
+                       if (order.status !== 'COMPLETED') {
+                         order.items?.forEach((item: any) => {
+                           realItems.push(`${item.orderedQuantity}x ${item.name}`);
+                         });
+                       }
+                    });
+                  }
+
                   const isWaiterRequested = operationalMode === 'FULL_SERVICE' && table.waiterRequested;
 
                   let cardBorder = 'border-gray-300';
@@ -843,13 +962,13 @@ export default function AdminPage() {
                         {isOccupied && (
                           <div className="space-y-3">
                             <div className="bg-gray-50 rounded p-2 text-xs text-gray-600 h-16 overflow-y-auto">
-                               {mockItems.map((item, idx) => (
+                               {realItems.length > 0 ? realItems.map((item, idx) => (
                                  <div key={idx} className="truncate">• {item}</div>
-                               ))}
+                               )) : <div className="text-gray-400 italic">No items ordered yet</div>}
                             </div>
                             <div className="flex items-end justify-between pt-2 border-t border-gray-100">
-                              <span className="text-xs text-gray-500 font-medium">Time: <span className="text-gray-900">{mockElapsed}</span></span>
-                              <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">${mockTotal}</span>
+                              <span className="text-xs text-gray-500 font-medium">Time: <span className="text-gray-900">{realElapsed || '0 mins'}</span></span>
+                              <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">${realTotal || '0.00'}</span>
                             </div>
                             {table.activeSession && (
                               <button
@@ -1016,7 +1135,7 @@ export default function AdminPage() {
                           />
                           <button
                             type="button"
-                            onClick={handleRemoveImage}
+                            onClick={() => handleRemoveImage(false)}
                             className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-sm hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
                             aria-label="Remove image"
                           >
@@ -1148,7 +1267,7 @@ export default function AdminPage() {
                   });
 
                   const totalSubtotal = overallSales - totalTaxCollected;
-                  const gstRate = gstEstablishmentType === 'STANDALONE' ? 0.05 : 0.18;
+                  const gstRate = establishmentType === 'RESTAURANT' ? 0.05 : 0.18;
                   const gstPayable = totalSubtotal * gstRate;
 
                   return (
@@ -1184,14 +1303,9 @@ export default function AdminPage() {
                          </div>
                          <div className="text-3xl font-black tabular-nums tracking-tight mb-2 relative z-10">${gstPayable.toFixed(2)}</div>
                          <div className="relative z-10 text-xs">
-                           <select 
-                             value={gstEstablishmentType}
-                             onChange={(e) => setGstEstablishmentType(e.target.value as any)}
-                             className="bg-indigo-900/50 border border-indigo-400 text-white rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer"
-                           >
-                             <option value="STANDALONE">Standalone (5%)</option>
-                             <option value="HOTEL">Hotel (18%)</option>
-                           </select>
+                           <span className="bg-indigo-900/50 border border-indigo-400 text-white rounded px-2 py-1 outline-none text-xs font-semibold">
+                             {establishmentType === 'HOTEL' ? 'Hotel (18%)' : 'Restaurant (5%)'}
+                           </span>
                          </div>
                       </div>
                     </div>
@@ -1241,6 +1355,47 @@ export default function AdminPage() {
                   );
                 })()}
              </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="p-6 max-w-2xl mx-auto animate-fade-in space-y-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+                  <h2 className="text-lg font-bold text-gray-900">Payment Settings</h2>
+                  <p className="text-sm text-gray-500 mt-1">Configure Direct UPI to avoid gateway fees.</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">UPI ID (VPA)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. merchant@sbi"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Merchant Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Table Top Cafe"
+                      value={merchantName}
+                      onChange={(e) => setMerchantName(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      onClick={savePaymentSettings}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-sm transition-colors"
+                    >
+                      Save Settings
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </main>
