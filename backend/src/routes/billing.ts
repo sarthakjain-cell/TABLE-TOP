@@ -11,6 +11,7 @@ interface SplitPaymentItem {
 interface PaySplitBody {
   customerName?: string;
   customerPhone?: string;
+  paymentMethod?: string;
   items: SplitPaymentItem[];
 }
 
@@ -343,7 +344,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
              io.emit('orderStatusUpdated', {
                 orderId: updatedOrder.id,
                 status: updatedOrder.status,
-                paymentMethod: updatedOrder.paymentMethod
+                paymentMethod: updatedOrder.paymentMethod || undefined
              });
           }
         }
