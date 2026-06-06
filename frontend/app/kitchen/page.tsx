@@ -127,8 +127,10 @@ export default function KitchenPage() {
           .catch(console.error);
       }
     };
-    initData();
-  }, [authToken]);
+    if (isConnected) {
+      initData();
+    }
+  }, [authToken, isConnected]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;

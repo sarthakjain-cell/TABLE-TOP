@@ -291,8 +291,10 @@ export default function AdminPage() {
         .catch(err => console.error('Error fetching admin transactions', err));
       }
     };
-    initData();
-  }, [authToken]);
+    if (isConnected) {
+      initData();
+    }
+  }, [authToken, isConnected]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
