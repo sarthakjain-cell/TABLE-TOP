@@ -485,7 +485,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           name: customerName || '',
           room: customerPhone || session.table.number
         } : undefined
-});
+        }
+      });
 
       return reply.code(200).send({ success: true, transaction: result.createdTx });
     } catch (error: any) {
