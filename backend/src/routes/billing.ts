@@ -423,10 +423,20 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
         const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
-        // Transition order state from PENDING to NEW
-        const updatedOrder = await tx.order.update({
+        // Transition order state from PENDING to NEW using an atomic update to prevent TOCTOU Race Conditions
+        const updateResult = await tx.order.updateMany({
+          where: { id: pendingOrder.id, status: 'PENDING' },
+          data: { status: 'NEW' }
+        });
+
+        // If count is 0, another concurrent request already checked out this cart!
+        if (updateResult.count === 0) {
+          throw new Error('CONCURRENCY_ERROR: Cart was already checked out.');
+        }
+
+        // Fetch the updated order so we can return the items in the response
+        const updatedOrder = await tx.order.findUniqueOrThrow({
           where: { id: pendingOrder.id },
-          data: { status: 'NEW' },
           include: {
             items: { include: { menuItem: true } }
           }
@@ -475,13 +485,15 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           name: customerName || '',
           room: customerPhone || session.table.number
         } : undefined
-        }
-      });
+});
 
       return reply.code(200).send({ success: true, transaction: result.createdTx });
     } catch (error: any) {
+      if (error.message && error.message.includes('CONCURRENCY_ERROR')) {
+        return reply.code(409).send({ error: 'Checkout already in progress or completed.' });
+      }
       fastify.log.error(error);
-      return reply.code(400).send({ error: error.message || 'Failed to checkout cart' });
+      return reply.code(500).send({ error: error.message || 'Internal Server Error' });
     }
   });
 
