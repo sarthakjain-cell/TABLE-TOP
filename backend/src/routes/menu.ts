@@ -2,6 +2,9 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '../prisma';
 import { getIO } from '../socket';
 import { requireRole } from '../middleware/auth';
+import NodeCache from 'node-cache';
+
+const menuCache = new NodeCache({ stdTTL: 60, checkperiod: 120 });
 
 interface CreateMenuItemBody {
   name: string;
@@ -75,6 +78,10 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       if (io) {
         io.emit('menuUpdated', { restaurantId });
       }
+      
+      // Selectively invalidate this tenant's cache
+      menuCache.del('menu_' + restaurantId);
+      
       return reply.code(201).send(menuItem);
     } catch (error) {
       fastify.log.error(error);
@@ -97,11 +104,23 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const { restaurantId } = request.query;
 
     try {
+      const cacheKey = 'menu_' + restaurantId;
+      const cachedMenu = menuCache.get(cacheKey);
+
+      if (cachedMenu) {
+        reply.header('X-Cache', 'HIT');
+        return cachedMenu;
+      }
+
+      reply.header('X-Cache', 'MISS');
       // findMany inherently selects all schema fields including imageUrl
       const items = await prisma.menuItem.findMany({
         where: { restaurantId },
         orderBy: { name: 'asc' },
       });
+      
+      menuCache.set(cacheKey, items);
+      
       return items;
     } catch (error) {
       fastify.log.error(error);
@@ -163,6 +182,10 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       if (io) {
         io.emit('menuUpdated', { restaurantId });
       }
+
+      // Selectively invalidate this tenant's cache
+      menuCache.del('menu_' + restaurantId);
+
       return updatedItem;
     } catch (error) {
       fastify.log.error(error);
@@ -204,6 +227,9 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       io.emit('menuItemAvailabilityChanged', { menuItemId: id, isAvailable });
       io.emit('menuUpdated', { restaurantId: updatedItem.restaurantId });
 
+      // Selectively invalidate this tenant's cache
+      menuCache.del('menu_' + updatedItem.restaurantId);
+
       return updatedItem;
     } catch (error) {
       fastify.log.error(error);
@@ -238,6 +264,10 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       if (io) {
         io.emit('menuUpdated', { restaurantId: item.restaurantId });
       }
+      
+      // Selectively invalidate this tenant's cache
+      menuCache.del('menu_' + item.restaurantId);
+      
       return reply.code(204).send();
     } catch (error: any) {
       fastify.log.error(error);
@@ -273,13 +303,23 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         return reply.code(404).send({ error: 'Invalid or inactive table token' });
       }
 
-      // 2. Fetch the menu items for that specific restaurant
-      const items = await prisma.menuItem.findMany({
-        where: { restaurantId: table.restaurantId, isAvailable: true },
-        orderBy: { name: 'asc' },
-      });
+      const cacheKey = 'menu_' + table.restaurantId;
+      let items: any[] | undefined = menuCache.get(cacheKey);
+
+      if (items) {
+        reply.header('X-Cache', 'HIT');
+      } else {
+        reply.header('X-Cache', 'MISS');
+        // Fetch the master menu items for that specific restaurant
+        items = await prisma.menuItem.findMany({
+          where: { restaurantId: table.restaurantId },
+          orderBy: { name: 'asc' },
+        });
+        menuCache.set(cacheKey, items);
+      }
       
-      return items;
+      // Filter the master list to only serve available items to the table
+      return items.filter(item => item.isAvailable);
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to fetch table menu items' });
