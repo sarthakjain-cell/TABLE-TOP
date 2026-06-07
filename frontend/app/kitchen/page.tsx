@@ -79,14 +79,6 @@ export default function KitchenPage() {
     const initData = async () => {
       let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
       
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedRestId);
-      if (storedRestId && !isUUID) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('tabletop_restaurant_id');
-        }
-        storedRestId = '';
-      }
-      
       if (!storedRestId && authToken) {
          setErrorMessage("Restaurant ID not found");
       }

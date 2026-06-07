@@ -86,8 +86,19 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (token) {
         localStorage.setItem('tabletop_auth_token', token);
         document.cookie = `tabletop_auth_token=${token}; path=/; max-age=86400; SameSite=Strict; Secure`;
+        try {
+          const raw = atob(token.replace(/-/g, '+').replace(/_/g, '/'));
+          const parsed = JSON.parse(raw);
+          const payload = JSON.parse(parsed.payload);
+          if (payload.restaurantId) {
+             localStorage.setItem('tabletop_restaurant_id', payload.restaurantId);
+          }
+        } catch (e) {
+          console.error('Failed to decode token restaurantId', e);
+        }
       } else {
         localStorage.removeItem('tabletop_auth_token');
+        localStorage.removeItem('tabletop_restaurant_id');
         document.cookie = 'tabletop_auth_token=; path=/; max-age=0; SameSite=Strict; Secure';
       }
     }
@@ -99,8 +110,19 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const savedToken = localStorage.getItem('tabletop_auth_token');
       if (savedToken && hasCookie) {
         setAuthTokenState(savedToken);
+        try {
+          const raw = atob(savedToken.replace(/-/g, '+').replace(/_/g, '/'));
+          const parsed = JSON.parse(raw);
+          const payload = JSON.parse(parsed.payload);
+          if (payload.restaurantId) {
+             localStorage.setItem('tabletop_restaurant_id', payload.restaurantId);
+          }
+        } catch (e) {
+          console.error('Failed to decode token restaurantId', e);
+        }
       } else if (savedToken && !hasCookie) {
         localStorage.removeItem('tabletop_auth_token');
+        localStorage.removeItem('tabletop_restaurant_id');
       }
     }
 

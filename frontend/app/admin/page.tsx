@@ -235,12 +235,6 @@ export default function AdminPage() {
     const initData = async () => {
       let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
       
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedRestId);
-      if (storedRestId && !isUUID) {
-         storedRestId = '';
-         if (typeof window !== 'undefined') localStorage.removeItem('tabletop_restaurant_id');
-      }
-      
       setRestaurantId(storedRestId);
 
       if (storedRestId && authToken) {
