@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
 import dynamic from 'next/dynamic';
+import { CheckCircle, Users } from 'lucide-react';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
   ssr: false,
@@ -25,6 +26,7 @@ interface MenuItem {
 export default function CustomerPage({ params }: { params: { tableToken: string } }) {
   const { tableToken } = params;
   const {
+    socket,
     isConnected,
     tableSession,
     joinTableSession,
@@ -54,6 +56,23 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category || 'Main Course')))];
 
   const [showUpiOptions, setShowUpiOptions] = useState(false);
+
+  // Multiplayer Split State
+  interface SplitPortion {
+    id: string;
+    name: string;
+    amount: number;
+    status: 'PENDING' | 'CLAIMED' | 'PAID';
+  }
+
+  interface SplitLobby {
+    sessionId: string;
+    splits: SplitPortion[];
+    isComplete: boolean;
+  }
+
+  const [splitLobby, setSplitLobby] = useState<SplitLobby | null>(null);
+  const [localClaimedSplitId, setLocalClaimedSplitId] = useState<string | null>(null);
 
   // 1. Verify token & join table room on mount
   useEffect(() => {
@@ -135,11 +154,23 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     }
 
     return () => {
-      if (loaderRef.current) {
-        observer.unobserve(loaderRef.current);
-      }
+      // Cleanup if needed
     };
-  }, [loaderRef]);
+  }, [tableToken, joinTableSession]);
+
+  // Handle Multiplayer Split Socket Sync
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleSplitSync = ({ lobby }: { lobby: SplitLobby | null }) => {
+      setSplitLobby(lobby);
+    };
+    
+    socket.on('splitPaymentSync', handleSplitSync);
+    return () => {
+      socket.off('splitPaymentSync', handleSplitSync);
+    };
+  }, [socket]);
 
   if (error) {
     return (
@@ -246,6 +277,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       setPaymentProcessing(false);
     }
   };
+
+  // Automatically execute checkout if the lobby is complete
+  useEffect(() => {
+    if (splitLobby?.isComplete) {
+      executeCheckout('UPI');
+      setSplitLobby(null);
+      setLocalClaimedSplitId(null);
+    }
+  }, [splitLobby?.isComplete]);
 
   const cartSubtotalCalc = parseFloat(tableSession?.cart?.subtotal || '0');
   const calculatedTax = parseFloat(decimalMath.calculateTax(cartSubtotalCalc, restaurant?.taxRate || 0));
@@ -778,14 +818,17 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 </div>
 
                 <button
-                  onClick={() => executeCheckout('CASH')}
-                  disabled={paymentProcessing || remaining !== 0}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-emerald-500/30 disabled:opacity-50 mt-4 text-lg tracking-tight"
-                >
-                  {paymentProcessing ? 'Processing...' : 'Submit Split Payments to Waiter'}
-                </button>
-              </div>
-            )}
+                    onClick={() => {
+                      const validSplits = contributors.filter(c => parseFloat(c.amount) > 0);
+                      socket?.emit('initiateSplitPayment', { splits: validSplits.map(c => ({ ...c, amount: parseFloat(c.amount) })) });
+                    }}
+                    disabled={paymentProcessing || remaining !== 0}
+                    className="w-full bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-indigo-500/30 disabled:opacity-50 mt-4 text-lg tracking-tight flex items-center justify-center gap-2"
+                  >
+                    <Users size={24} /> Start Multiplayer Split
+                  </button>
+                </div>
+              )}
 
             {checkoutMode === 'CHARGE_ROOM' && (
               <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
@@ -827,6 +870,81 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 5. Multiplayer Split Payment Lobby Modal */}
+        {splitLobby && !splitLobby.isComplete && (
+          <div className="fixed inset-0 bg-slate-900/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in">
+            <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+              {localClaimedSplitId ? (() => {
+                const mySplit = splitLobby.splits.find(s => s.id === localClaimedSplitId);
+                if (!mySplit) return null;
+                
+                // Construct UPI Intent String
+                const merchantVpa = restaurant?.upiId || 'test@upi';
+                const merchantName = encodeURIComponent(restaurant?.merchantName || restaurant?.name || 'Restaurant');
+                const upiString = `upi://pay?pa=${merchantVpa}&pn=${merchantName}&am=${mySplit.amount.toFixed(2)}&cu=INR`;
+                
+                return (
+                  <div className="text-center space-y-6">
+                    <h3 className="text-2xl font-black text-gray-800">Pay Your Share</h3>
+                    <p className="text-gray-500 font-medium">Paying ₹{mySplit.amount.toFixed(2)} for {mySplit.name}</p>
+                    
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border-2 border-indigo-100 inline-block mx-auto">
+                       <QRCodeSVG value={upiString} size={200} level="H" />
+                    </div>
+                    
+                    <a href={upiString} className="block w-full py-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-black rounded-xl transition-colors sm:hidden border border-indigo-200">
+                      Open UPI App
+                    </a>
+                    
+                    <button 
+                      onClick={() => {
+                        socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
+                        setLocalClaimedSplitId(null);
+                      }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform"
+                    >
+                      I Have Sent the UPI
+                    </button>
+                  </div>
+                );
+              })() : (
+                <div className="space-y-6">
+                   <h3 className="text-2xl font-black text-gray-800 text-center mb-4">Multiplayer Split</h3>
+                   <div className="space-y-3">
+                     {splitLobby.splits.map(split => (
+                       <div key={split.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
+                         split.status === 'PAID' ? 'bg-emerald-50 border-emerald-200' :
+                         split.status === 'CLAIMED' ? 'bg-amber-50 border-amber-200 opacity-50' :
+                         'bg-white border-gray-200 hover:border-indigo-400'
+                       }`}>
+                         <div>
+                           <p className="font-bold text-gray-800">{split.name}</p>
+                           <p className="text-sm font-bold text-gray-500">₹{split.amount.toFixed(2)}</p>
+                         </div>
+                         <div>
+                           {split.status === 'PAID' && <span className="text-emerald-600 font-black flex items-center gap-1"><CheckCircle size={18}/> PAID</span>}
+                           {split.status === 'CLAIMED' && <span className="text-amber-600 font-bold text-sm">Paying...</span>}
+                           {split.status === 'PENDING' && (
+                             <button 
+                               onClick={() => {
+                                 setLocalClaimedSplitId(split.id);
+                                 socket?.emit('claimSplitPayment', { splitId: split.id });
+                               }}
+                               className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform"
+                             >
+                               Pay This
+                             </button>
+                           )}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

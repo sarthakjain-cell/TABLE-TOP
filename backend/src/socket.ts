@@ -28,6 +28,7 @@ export interface ServerToClientEvents {
   establishmentSettingsChanged: (data: any) => void;
   newOrderReceived: (data: { order: any }) => void;
   newOrderSubmitted: (data: { order: any }) => void;
+  splitPaymentSync: (data: { lobby: any | null }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -41,6 +42,9 @@ export interface ClientToServerEvents {
     callback?: (res: { success: boolean; error?: string }) => void
   ) => void;
   requestHelp: (data: { tableId: string; requestType: string }) => void;
+  initiateSplitPayment: (data: { splits: { id: string; name: string; amount: number }[] }) => void;
+  claimSplitPayment: (data: { splitId: string }) => void;
+  confirmSplitPayment: (data: { splitId: string }) => void;
 }
 
 export interface InterServerEvents {}
@@ -51,6 +55,21 @@ export interface SocketData {
 }
 
 let io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | null = null;
+
+export interface SplitPortion {
+  id: string;
+  name: string;
+  amount: number;
+  status: 'PENDING' | 'CLAIMED' | 'PAID';
+}
+
+export interface SplitLobby {
+  sessionId: string;
+  splits: SplitPortion[];
+  isComplete: boolean;
+}
+
+const activeSplitLobbies = new Map<string, SplitLobby>();
 
 /**
  * Calculates high-precision aggregated cart state for a table session.
@@ -280,14 +299,17 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
       fastify.log.info(`Socket ${socket.id} joined room ${roomName} (resync triggered)`);
 
       try {
-        const syncData = await getTableSessionSyncData(sessionId);
-        if (syncData) {
-          // Push exclusive synchronization payload directly to the reconnecting client
-          socket.emit('sessionSynced', syncData);
-          if (callback) callback({ success: true, state: syncData });
-        } else {
-          if (callback) callback({ success: false, error: 'Dining session not found.' });
+        const tableSyncData = await getTableSessionSyncData(sessionId);
+        if (tableSyncData) {
+          socket.emit('sessionSynced', tableSyncData);
         }
+        
+        const lobby = activeSplitLobbies.get(sessionId);
+        if (lobby) {
+          socket.emit('splitPaymentSync', { lobby });
+        }
+
+        if (callback) callback({ success: true, sessionId });
       } catch (err: any) {
         fastify.log.error(err);
         if (callback) callback({ success: false, error: err.message });
@@ -498,6 +520,63 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
       io?.emit('helpRequested', { tableNumber: tableId, requestType });
     });
 
+    // ----------------------------------------------------
+    // MULTIPLAYER SPLIT PAYMENT LOBBY EVENTS
+    // ----------------------------------------------------
+
+    socket.on('initiateSplitPayment', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+      
+      const splits: SplitPortion[] = data.splits.map((s: any) => ({
+        ...s,
+        status: 'PENDING'
+      }));
+
+      const lobby: SplitLobby = {
+        sessionId,
+        splits,
+        isComplete: false
+      };
+
+      activeSplitLobbies.set(sessionId, lobby);
+      io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+    });
+
+    socket.on('claimSplitPayment', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+
+      const lobby = activeSplitLobbies.get(sessionId);
+      if (!lobby) return;
+
+      const split = lobby.splits.find((s: SplitPortion) => s.id === data.splitId);
+      if (split && split.status === 'PENDING') {
+        split.status = 'CLAIMED';
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+      }
+    });
+
+    socket.on('confirmSplitPayment', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+
+      const lobby = activeSplitLobbies.get(sessionId);
+      if (!lobby) return;
+
+      const split = lobby.splits.find((s: SplitPortion) => s.id === data.splitId);
+      if (split) {
+        split.status = 'PAID';
+        lobby.isComplete = lobby.splits.every((s: SplitPortion) => s.status === 'PAID');
+        
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+
+        // The frontend will listen for lobby.isComplete and trigger executeCheckout('CASH' -> modified for Split) 
+        // to move the order to PAYMENT_PENDING.
+      }
+    });
+
+    // Handle client disconnect
     socket.on('disconnect', () => {
       fastify.log.info(`Socket disconnected: ${socket.id}`);
     });
