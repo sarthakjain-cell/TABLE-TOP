@@ -430,7 +430,8 @@ export default function AdminPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed with status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -439,9 +440,9 @@ export default function AdminPage() {
       } else {
         setNewDishImageUrl(data.url);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      setUploadError('Failed to upload image. Please try again.');
+      setUploadError(error.message || 'Failed to upload image. Please try again.');
     } finally {
       setIsUploadingImage(false);
     }
