@@ -332,7 +332,7 @@ export default function KitchenPage() {
               {tickets.map(ticket => {
                 const elapsedMs = currentTime.getTime() - new Date(ticket.createdAt).getTime();
                 const elapsedMins = Math.floor(elapsedMs / 60000);
-                const isDelayed = elapsedMins >= 15;
+                const isDelayed = elapsedMins >= 10;
                 
                 const isNew = ticket.status === 'NEW';
                 const isPreparing = ticket.status === 'PREPARING';
