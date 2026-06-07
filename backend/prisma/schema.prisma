@@ -71,6 +71,7 @@ model Table {
   updatedAt    DateTime    @updatedAt
 
   @@unique([restaurantId, number])
+  @@index([restaurantId])
 }
 
 model Session {
@@ -83,6 +84,9 @@ model Session {
   transactions Transaction[]
   createdAt    DateTime      @default(now())
   closedAt     DateTime?
+
+  @@index([tableId])
+  @@index([restaurantId, status])
 }
 
 model MenuItem {
@@ -100,6 +104,8 @@ model MenuItem {
   orderItems     OrderItem[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+
+  @@index([restaurantId])
 }
 
 model Order {
@@ -111,6 +117,8 @@ model Order {
   items         OrderItem[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([sessionId])
 }
 
 model OrderItem {
@@ -124,6 +132,8 @@ model OrderItem {
   modifications String[]           // Array of user requests like "No onions", "Extra cheese"
   payments      OrderItemPayment[]
   createdAt     DateTime           @default(now())
+
+  @@index([orderId])
 }
 
 model Transaction {
@@ -139,6 +149,8 @@ model Transaction {
   paymentItems       OrderItemPayment[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+
+  @@index([sessionId])
 }
 
 model OrderItemPayment {
@@ -151,4 +163,7 @@ model OrderItemPayment {
   amount        Decimal     @db.Decimal(10, 2) // Calculated subtotal for this portion
   taxFraction   Decimal     @db.Decimal(10, 4) // Exact tax portion attributed to this split item
   createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+  @@index([orderItemId])
 }
