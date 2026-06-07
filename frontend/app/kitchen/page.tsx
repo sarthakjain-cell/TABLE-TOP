@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { Clock, ToggleLeft, ToggleRight, CheckCircle, Flame, History, X, Bell } from 'lucide-react';
 
@@ -43,6 +43,34 @@ export default function KitchenPage() {
   const [shiftStarted, setShiftStarted] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const activeItems = useMemo(() => {
+    const counts: Record<string, number> = {};
+    tickets.forEach(ticket => {
+      if (ticket.status === 'NEW' || ticket.status === 'PREPARING') {
+        ticket.items.forEach(item => {
+          counts[item.name] = (counts[item.name] || 0) + item.quantity;
+        });
+      }
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [tickets]);
+
+  const virtualTickets = useMemo(() => {
+    return tickets.flatMap(ticket => {
+      if (ticket.items.length <= 8) {
+        return [{ ...ticket, virtualId: ticket.id, page: 1, totalPages: 1 }];
+      }
+      const pages = Math.ceil(ticket.items.length / 8);
+      return Array.from({ length: pages }).map((_, i) => ({
+        ...ticket,
+        virtualId: `${ticket.id}-pg${i + 1}`,
+        page: i + 1,
+        totalPages: pages,
+        items: ticket.items.slice(i * 8, (i + 1) * 8),
+      }));
+    });
+  }, [tickets]);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -329,7 +357,7 @@ export default function KitchenPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start auto-rows-max relative z-10">
-              {tickets.map(ticket => {
+              {virtualTickets.map(ticket => {
                 const elapsedMs = currentTime.getTime() - new Date(ticket.createdAt).getTime();
                 const elapsedMins = Math.floor(elapsedMs / 60000);
                 const isDelayed = elapsedMins >= 10;
@@ -346,7 +374,7 @@ export default function KitchenPage() {
                 else if (isNew) { borderColor = 'border-cyan-500'; shadowColor = 'shadow-[0_0_15px_rgba(34,211,238,0.2)]'; }
 
                 return (
-                  <div key={ticket.id} className={`bg-slate-900/80 backdrop-blur-md rounded-2xl border-2 ${borderColor} flex flex-col ${shadowColor} overflow-hidden transition-all`}>
+                  <div key={ticket.virtualId} className={`bg-slate-900/80 backdrop-blur-md rounded-2xl border-2 ${borderColor} flex flex-col ${shadowColor} overflow-hidden transition-all`}>
                     
                     {/* Ticket Header */}
                     <div className={`p-4 flex justify-between items-start border-b border-slate-800 ${isPaymentPending ? 'bg-indigo-500/10' : isPreparing ? 'bg-amber-400/5' : isDelayed ? 'bg-rose-500/5' : 'bg-cyan-500/5'}`}>
@@ -357,7 +385,7 @@ export default function KitchenPage() {
                            </div>
                          )}
                          <h3 className="text-3xl font-black tracking-tighter text-white leading-none drop-shadow-md">
-                           {establishmentType === 'HOTEL' ? 'RM' : 'TBL'} {ticket.tableNumber}
+                           {establishmentType === 'HOTEL' ? 'RM' : 'TBL'} {ticket.tableNumber} {ticket.totalPages > 1 && <span className="text-xl text-cyan-400 font-bold ml-2">({ticket.page}/{ticket.totalPages})</span>}
                          </h3>
                          <span className="inline-block mt-2 font-black text-cyan-400/70 tracking-[0.2em] text-xs bg-cyan-950/50 border border-cyan-900 px-2 py-1 rounded">
                            ID:{ticket.id.slice(-6).toUpperCase()}
@@ -405,7 +433,7 @@ export default function KitchenPage() {
                           </div>
                           <button 
                             onClick={() => updateOrderStatus(ticket.id, 'NEW')}
-                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-lg py-4 rounded-xl active:scale-95 transition-all tracking-widest shadow-md"
+                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xl py-8 rounded-xl active:scale-95 transition-all tracking-widest shadow-md"
                           >
                             CONFIRM PAYMENT & COOK
                           </button>
@@ -415,7 +443,7 @@ export default function KitchenPage() {
                       {ticket.status === 'NEW' && (
                         <button 
                           onClick={() => updateOrderStatus(ticket.id, 'PREPARING')}
-                          className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-amber-500/50 text-slate-300 hover:text-amber-400 font-black text-xl py-5 rounded-xl active:scale-95 transition-all tracking-widest shadow-inner"
+                          className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-amber-500/50 text-slate-300 hover:text-amber-400 font-black text-2xl py-8 rounded-xl active:scale-95 transition-all tracking-widest shadow-inner"
                         >
                           INIT PREP
                         </button>
@@ -424,23 +452,23 @@ export default function KitchenPage() {
                       {ticket.status === 'PREPARING' && (
                         <button 
                           onClick={() => updateOrderStatus(ticket.id, 'READY_TO_SERVE')}
-                          className={`w-full text-slate-950 font-black text-xl py-5 rounded-xl active:scale-95 transition-all shadow-[0_0_20px_currentColor] flex items-center justify-center gap-3 tracking-widest ${
+                          className={`w-full text-slate-950 font-black text-2xl py-8 rounded-xl active:scale-95 transition-all shadow-[0_0_20px_currentColor] flex items-center justify-center gap-3 tracking-widest ${
                             operationalMode === 'FULL_SERVICE' 
                               ? 'bg-emerald-400 hover:bg-emerald-300 text-emerald-400 shadow-emerald-400/40' 
                               : 'bg-amber-400 hover:bg-amber-300 text-amber-400 shadow-amber-400/40'
                           }`}
                           style={{ color: '#020617' /* slate-950 text */ }}
                         >
-                          {operationalMode === 'FULL_SERVICE' ? 'READY_SRV' : <><Bell size={24} /> PING_COLLECT</>}
+                          {operationalMode === 'FULL_SERVICE' ? 'READY_SRV' : <><Bell size={28} /> PING_COLLECT</>}
                         </button>
                       )}
 
                       {ticket.status === 'READY_TO_SERVE' && (
                         <button 
                           onClick={() => updateOrderStatus(ticket.id, 'COMPLETED')}
-                          className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xl py-5 rounded-xl active:scale-95 transition-all shadow-[0_0_20px_rgba(34,211,238,0.4)] flex items-center justify-center gap-2 tracking-widest"
+                          className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-2xl py-8 rounded-xl active:scale-95 transition-all shadow-[0_0_20px_rgba(34,211,238,0.4)] flex items-center justify-center gap-2 tracking-widest"
                         >
-                          <CheckCircle size={24} /> PURGE_TICKET
+                          <CheckCircle size={28} /> PURGE_TICKET
                         </button>
                       )}
                     </div>
@@ -451,13 +479,36 @@ export default function KitchenPage() {
           )}
         </section>
 
-        {/* Right: The 86 Switchboard (25%) */}
+        {/* Right: Aggregation & 86 Switchboard (25%) */}
         <aside className="w-1/4 border-l border-cyan-900/30 bg-slate-900/50 backdrop-blur-xl flex flex-col shadow-2xl z-20">
-          <div className="p-5 border-b border-cyan-900/30 bg-slate-900/80 backdrop-blur-md">
-            <h2 className="text-2xl font-black tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-amber-500">SYS_86_BOARD</h2>
-            <p className="text-slate-400 font-bold text-xs mt-1 tracking-widest uppercase">Inventory Override Override</p>
+          
+          {/* Prep Summary Aggregation */}
+          <div className="flex-1 flex flex-col min-h-[50%] border-b border-cyan-900/30">
+            <div className="p-5 border-b border-cyan-900/30 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
+              <h2 className="text-2xl font-black tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">PREP_SUMMARY</h2>
+              <p className="text-slate-400 font-bold text-xs mt-1 tracking-widest uppercase">Active Global Quantities</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+              {activeItems.length === 0 ? (
+                <div className="text-center py-10 opacity-50 font-bold text-cyan-600 tracking-widest">NO ACTIVE ITEMS</div>
+              ) : (
+                activeItems.map(([name, qty]) => (
+                  <div key={name} className="flex items-center justify-between bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                    <span className="font-black text-slate-200 tracking-tight truncate pr-4">{name}</span>
+                    <span className="text-xl font-black text-emerald-400 bg-emerald-950/50 px-3 py-1 rounded-lg border border-emerald-900/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]">{qty}x</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+
+          {/* 86 Switchboard */}
+          <div className="flex-1 flex flex-col min-h-[50%]">
+            <div className="p-5 border-b border-cyan-900/30 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
+              <h2 className="text-2xl font-black tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-amber-500">SYS_86_BOARD</h2>
+              <p className="text-slate-400 font-bold text-xs mt-1 tracking-widest uppercase">Inventory Override</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             {menuItems.map(item => (
               <button
                 key={item.id}
@@ -478,6 +529,7 @@ export default function KitchenPage() {
                 )}
               </button>
             ))}
+            </div>
           </div>
         </aside>
 
