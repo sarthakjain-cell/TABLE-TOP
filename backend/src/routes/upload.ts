@@ -34,7 +34,7 @@ const uploadRoutes: FastifyPluginAsync = async (fastify, opts) => {
       return reply.send({ url: (uploadResult as any).secure_url });
     } catch (error) {
       fastify.log.error(error, 'Upload Error:');
-      return reply.code(500).send({ error: 'Failed to upload image' });
+      return reply.code(500).send({ error: 'Failed to upload image: ' + (error.message || JSON.stringify(error)) });
     }
   });
 };
