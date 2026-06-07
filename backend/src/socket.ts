@@ -309,7 +309,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
           socket.emit('splitPaymentSync', { lobby });
         }
 
-        if (callback) callback({ success: true, sessionId });
+        if (callback) callback({ success: true, sessionId, state: tableSyncData });
       } catch (err: any) {
         fastify.log.error(err);
         if (callback) callback({ success: false, error: err.message });
