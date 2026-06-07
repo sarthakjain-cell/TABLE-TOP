@@ -172,35 +172,6 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     };
   }, [socket]);
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            ⚠️
-          </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">Scan Verification Failed</h1>
-          <p className="text-gray-500 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold shadow-md active:bg-red-700 transition"
-          >
-            Retry Scan Scan
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!tableSession) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
-        <p className="text-gray-500 font-medium">Syncing table session state...</p>
-      </div>
-    );
-  }
-
   const getFullUnpaidItemsPayload = () => {
     const items: any[] = [];
     tableSession?.orders?.flatMap((o: any) => o.items).forEach((item: any) => {
@@ -230,8 +201,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
     try {
       if (isCartCheckout || checkoutMode === 'CHARGE_ROOM') {
-        // Hotel cart checkout (pre-payment before kitchen submission)
-        const response = await fetch(`/api/sessions/${tableSession.sessionId}/checkout-cart`, {
+        const response = await fetch(`/api/sessions/${tableSession?.sessionId}/checkout-cart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ customerName, customerPhone })
@@ -241,14 +211,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           throw new Error(errData.error || 'Cart checkout failed');
         }
       } else {
-        // Standard split payment for existing orders
         const payloadItems = getFullUnpaidItemsPayload();
         if (payloadItems.length === 0) {
           setPaymentProcessing(false);
           return;
         }
         
-        const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-split`, {
+        const response = await fetch(`/api/sessions/${tableSession?.sessionId}/pay-split`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -286,6 +255,35 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       setLocalClaimedSplitId(null);
     }
   }, [splitLobby?.isComplete]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            ⚠️
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">Scan Verification Failed</h1>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold shadow-md active:bg-red-700 transition"
+          >
+            Retry Scan Scan
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tableSession) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
+        <p className="text-gray-500 font-medium">Syncing table session state...</p>
+      </div>
+    );
+  }
 
   const cartSubtotalCalc = parseFloat(tableSession?.cart?.subtotal || '0');
   const calculatedTax = parseFloat(decimalMath.calculateTax(cartSubtotalCalc, restaurant?.taxRate || 0));
