@@ -251,6 +251,17 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
       origin: '*',
       methods: ['GET', 'POST'],
     },
+    perMessageDeflate: {
+      threshold: 1024, // Only compress messages larger than 1KB
+      zlibDeflateOptions: {
+        chunkSize: 1024,
+        memLevel: 7,
+        level: 3 // Tradeoff between CPU usage and compression ratio
+      },
+      zlibInflateOptions: {
+        chunkSize: 10 * 1024
+      }
+    }
   });
 
   io.on('connection', (socket: Socket) => {

@@ -195,9 +195,29 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error('Socket server error returned:', err);
     });
 
+    // BFCache (Back/Forward Cache) Optimization
+    // Browsers will not cache pages with open WebSockets. We must explicitly close it when the page hides.
+    const handlePageHide = () => {
+      if (socketInstance.connected) {
+        socketInstance.disconnect();
+      }
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      // If the page is restored from the BFCache, reconnect the socket
+      if (event.persisted || socketInstance.disconnected) {
+        socketInstance.connect();
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+
     setSocket(socketInstance);
 
     return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
       socketInstance.off('connect');
       socketInstance.off('disconnect');
       socketInstance.off('sessionSynced');
