@@ -418,7 +418,10 @@ export default function AdminPage() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/upload', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const uploadEndpoint = apiUrl ? `${apiUrl}/api/upload` : '/api/upload';
+
+      const response = await fetch(uploadEndpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`
