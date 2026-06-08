@@ -21,6 +21,36 @@ interface CheckoutCartBody {
 }
 
 export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  fastify.get<{ Params: { id: string } }>('/api/transactions/:id', async (request, reply) => {
+    try {
+      const transaction = await prisma.transaction.findUnique({
+        where: { id: request.params.id },
+        include: {
+          session: {
+            include: {
+              table: {
+                include: { restaurant: true }
+              }
+            }
+          },
+          paymentItems: {
+            include: {
+              orderItem: {
+                include: { menuItem: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!transaction) return reply.code(404).send({ error: 'Transaction not found' });
+      return transaction;
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to fetch transaction' });
+    }
+  });
+
   // Get billing status for a session (subtotals, taxes, paid items, outstanding items)
   fastify.get<{ Params: { sessionId: string } }>('/api/sessions/:sessionId/billing-status', async (request, reply) => {
     const { sessionId } = request.params;
@@ -282,8 +312,9 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           });
         });
 
-        // If completely settled, automatically close the session and vacate the table
-        if (isFullyPaid) {
+        // If completely settled AND we are in POST_PAY mode, automatically close the session and vacate the table
+        // (In PRE_PAY, they pay upfront before receiving food, so we leave the session open)
+        if (isFullyPaid && session.table.restaurant.paymentMode === 'POST_PAY') {
           await tx.session.update({
             where: { id: sessionId },
             data: {
@@ -319,8 +350,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         };
       });
 
-      // Emit Table Vacant broadcast on full checkout
-      if (transaction.isFullyPaid) {
+      // Emit Table Vacant broadcast on full checkout only for POST_PAY
+      if (transaction.isFullyPaid && session.table.restaurant.paymentMode === 'POST_PAY') {
         const io = getIO();
         io.emit('helpRequested', {
           tableNumber: session.table.number,
