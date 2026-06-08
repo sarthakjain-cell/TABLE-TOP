@@ -40,27 +40,60 @@ export const receiptRoutes = async (fastify: FastifyInstance) => {
         data: { customerPhone: phone }
       });
 
-      // 3. Mock WhatsApp Cloud API Delivery
-      const receiptUrl = `http://localhost:3000/receipt/${transactionId}`;
+      // 3. Send via Meta WhatsApp Cloud API
+      const receiptUrl = `https://table-top-frontend-pi.vercel.app/receipt/${transactionId}`;
       const restaurantName = transaction.session.table.restaurant.name;
-      
-      fastify.log.info(`
-==================================================
-WHATSAPP CLOUD API (MOCK)
-To: ${phone}
-Template: digital_receipt
-Parameters:
- - RestaurantName: ${restaurantName}
- - Amount: $${transaction.amount.toString()}
- - Link: ${receiptUrl}
+      const amount = transaction.amount.toString();
 
-[SIMULATED MESSAGE]
-Hello! Thanks for dining at ${restaurantName}.
-Your payment of $${transaction.amount.toString()} was successful.
-View your digital receipt and future discounts here:
-${receiptUrl}
-==================================================
-      `);
+      // Ensure phone is strictly numerical and starts with country code (e.g., 919876543210)
+      const formattedPhone = phone.replace(/\D/g, '');
+
+      const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+      const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+      if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+        fastify.log.warn('WhatsApp credentials missing in .env! Simulating receipt instead.');
+        fastify.log.info(`[SIMULATED WHATSAPP TO ${formattedPhone}] Receipt: ${receiptUrl}`);
+        return { success: true, message: 'Simulated WhatsApp (credentials missing)' };
+      }
+
+      // Meta Graph API Request
+      const response = await fetch(`https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'template',
+          template: {
+            // NOTE: You MUST create an approved template named 'digital_receipt' in your Meta Dashboard
+            name: 'digital_receipt',
+            language: { code: 'en_US' },
+            components: [
+              {
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: restaurantName },
+                  { type: 'text', text: amount },
+                  { type: 'text', text: receiptUrl }
+                ]
+              }
+            ]
+          }
+        })
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        fastify.log.error('WhatsApp API Error:', responseData);
+        throw new Error(responseData.error?.message || 'Failed to send WhatsApp message via Meta API');
+      }
+
+      fastify.log.info(`WhatsApp Receipt Sent! Message ID: ${responseData.messages?.[0]?.id}`);
 
       return { success: true, message: 'Receipt sent successfully via WhatsApp' };
     } catch (error) {
