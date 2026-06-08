@@ -71,6 +71,7 @@ export default function AdminPage() {
   const [taxRate, setTaxRate] = useState<number>(0);
   const [upiId, setUpiId] = useState('');
   const [merchantName, setMerchantName] = useState('');
+  const [paymentMode, setPaymentMode] = useState<'PRE_PAY' | 'POST_PAY'>('POST_PAY');
   
   const [tables, setTables] = useState<Table[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -185,6 +186,29 @@ export default function AdminPage() {
       alert(`Failed to manually close session: ${err.message}`);
     }
   };
+
+  const handleApprovePayment = async (orderId: string) => {
+    if (!confirm('Are you sure you want to approve this payment and send the order to the kitchen?')) return;
+    
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}` 
+        },
+        body: JSON.stringify({ status: 'NEW' })
+      });
+      if (!res.ok) {
+         const data = await res.json();
+         throw new Error(data.error);
+      }
+      // Optimistically clear the requested state if needed
+      setTables(prev => prev.map(t => ({ ...t, waiterRequested: false })));
+    } catch (err: any) {
+      alert(`Failed to approve payment: ${err.message}`);
+    }
+  };
   const deleteTable = async (tableId: string) => {
     if (!confirm('Are you sure you want to delete this table? This will permanently remove its QR code and history.')) return;
     try {
@@ -250,10 +274,10 @@ export default function AdminPage() {
             setRestaurantName(data.name);
             setOperationalMode(data.operationalMode);
             setEstablishmentType(data.establishmentType);
-            setRoomServiceFee(data.roomServiceFee?.toString() || '0.00');
-            setTaxRate(data.taxRate);
+            setRoomServiceFee(data.roomServiceFee?.toString() || '0');
             setUpiId(data.upiId || '');
             setMerchantName(data.merchantName || '');
+            setPaymentMode(data.paymentMode || 'POST_PAY');
             if (data.tables) {
               const mapped = data.tables.map((t: any) => ({
                 ...t,
@@ -339,7 +363,7 @@ export default function AdminPage() {
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ establishmentType, upiId, merchantName })
+        body: JSON.stringify({ establishmentType, paymentMode, upiId, merchantName })
       });
       if (!res.ok) throw new Error('Failed to save settings');
       alert('Payment settings saved successfully!');
@@ -358,10 +382,13 @@ export default function AdminPage() {
       }
     };
 
-    const handleSettingsChange = (data: { restaurantId: string, establishmentType: 'RESTAURANT' | 'HOTEL', roomServiceFee: string }) => {
+    const handleSettingsChange = (data: { restaurantId: string, establishmentType: 'RESTAURANT' | 'HOTEL', paymentMode: 'PRE_PAY' | 'POST_PAY', roomServiceFee: string, upiId?: string, merchantName?: string }) => {
       if (data.restaurantId === restaurantId) {
         setEstablishmentType(data.establishmentType);
-        setRoomServiceFee(data.roomServiceFee?.toString() || '0.00');
+        if (data.paymentMode) setPaymentMode(data.paymentMode);
+        if (data.roomServiceFee) setRoomServiceFee(data.roomServiceFee.toString());
+        if (data.upiId !== undefined) setUpiId(data.upiId);
+        if (data.merchantName !== undefined) setMerchantName(data.merchantName);
       }
     };
     
@@ -401,8 +428,9 @@ export default function AdminPage() {
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ establishmentType, roomServiceFee: Number(fee) || 0 })
+        body: JSON.stringify({ establishmentType, paymentMode, roomServiceFee: parseFloat(roomServiceFee), upiId, merchantName })
       });
+      
       if (!res.ok) throw new Error('Failed to save fee');
     } catch (err) {
       console.error(err);
@@ -871,6 +899,7 @@ export default function AdminPage() {
                   let realElapsed: string | null = null;
                   let realTotal: string | null = null;
                   let realItems: string[] = [];
+                  let pendingPaymentOrderId: string | null = null;
 
                   if (isOccupied && table.activeSession) {
                     const diffMs = Date.now() - new Date(table.activeSession.createdAt).getTime();
@@ -879,6 +908,9 @@ export default function AdminPage() {
                     
                     let subtotal = '0.00';
                     table.activeSession.orders?.forEach((order: any) => {
+                      if (order.status === 'PAYMENT_PENDING') {
+                        pendingPaymentOrderId = order.id;
+                      }
                       if (order.status !== 'COMPLETED') {
                         order.items?.forEach((item: any) => {
                           const itemTotal = decimalMath.multiply(item.price, item.quantity);
@@ -977,6 +1009,14 @@ export default function AdminPage() {
                                 className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors border border-red-200"
                               >
                                 Bill Paid Manually / Vacate
+                              </button>
+                            )}
+                            {pendingPaymentOrderId && (
+                              <button
+                                onClick={() => handleApprovePayment(pendingPaymentOrderId!)}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm animate-pulse"
+                              >
+                                Verify & Approve Payment
                               </button>
                             )}
                           </div>
@@ -1367,7 +1407,43 @@ export default function AdminPage() {
                 </div>
                 <div className="p-6 space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">UPI ID (VPA)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Collection Mode</label>
+                    <div className="flex flex-col gap-3 mt-2">
+                      <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${paymentMode === 'PRE_PAY' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                        <div className="flex items-center h-5">
+                          <input
+                            type="radio"
+                            name="paymentMode"
+                            checked={paymentMode === 'PRE_PAY'}
+                            onChange={() => setPaymentMode('PRE_PAY')}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900">Require Payment Upfront (Pre-Pay)</span>
+                          <span className="text-xs text-gray-500 mt-1">Best for Cafes, Quick Service, and high-traffic areas. Waiter must manually verify the transaction before the kitchen receives the ticket.</span>
+                        </div>
+                      </label>
+
+                      <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${paymentMode === 'POST_PAY' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                        <div className="flex items-center h-5">
+                          <input
+                            type="radio"
+                            name="paymentMode"
+                            checked={paymentMode === 'POST_PAY'}
+                            onChange={() => setPaymentMode('POST_PAY')}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900">Open Tab / Pay at End (Post-Pay)</span>
+                          <span className="text-xs text-gray-500 mt-1">Best for Fine Dining, Bars, and heavy upsell environments. Orders go straight to the kitchen instantly.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">UPI ID (VPA)</label>
                     <input
                       type="text"
                       placeholder="e.g. merchant@sbi"

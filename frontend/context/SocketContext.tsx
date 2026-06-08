@@ -4,11 +4,12 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { io, Socket } from 'socket.io-client';
 import { Decimal } from 'decimal.js';
 
-interface TableSessionState {
+export interface TableSessionState {
   sessionId: string;
   tableId: string;
   tableNumber: string;
   restaurantMode: 'FULL_SERVICE' | 'SELF_SERVICE';
+  paymentMode: 'PRE_PAY' | 'POST_PAY';
   cart: {
     items: Array<{
       orderItemId: string;
@@ -49,7 +50,7 @@ interface SocketContextType {
   tableSession: TableSessionState | null;
   joinTableSession: (tableId: string, sessionId: string) => void;
   addItemToCart: (menuItemId: string, quantity: number, modifications?: string[]) => void;
-  submitCart: () => void;
+  submitCart: () => Promise<{ success: boolean; error?: string }>;
   requestHelp: (requestType: string) => void;
   authToken: string | null;
   setAuthToken: (token: string | null) => void;
@@ -174,6 +175,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     socketInstance.on('orderStatusUpdated', (data) => {
       console.log('Real-time order status update:', data);
+      window.dispatchEvent(new CustomEvent('order-status-updated', { detail: data }));
       if (sessionParams.current) {
         socketInstance.emit('joinSession', sessionParams.current, (res: any) => {
           if (res?.success) setTableSession(res.state);
@@ -281,15 +283,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const submitCart = () => {
-    const currentSocket = socketRef.current;
-    if (currentSocket && currentSocket.connected) {
-      currentSocket.emit('submitCart', (res: any) => {
-        if (!res?.success) {
-          console.error('Error submitting table cart:', res?.error);
-        }
-      });
-    }
+  const submitCart = (): Promise<{success: boolean; error?: string}> => {
+    return new Promise((resolve) => {
+      const currentSocket = socketRef.current;
+      if (currentSocket && currentSocket.connected) {
+        currentSocket.emit('submitCart', (res: any) => {
+          if (!res?.success) {
+            console.error('Error submitting table cart:', res?.error);
+          }
+          resolve(res);
+        });
+      } else {
+        resolve({ success: false, error: 'Socket not connected' });
+      }
+    });
   };
 
   const requestHelp = (requestType: string) => {

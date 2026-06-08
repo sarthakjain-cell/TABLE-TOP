@@ -14,6 +14,7 @@ interface UpdateModeBody {
 
 interface UpdateSettingsBody {
   establishmentType: 'RESTAURANT' | 'HOTEL';
+  paymentMode?: 'PRE_PAY' | 'POST_PAY';
   roomServiceFee?: number;
   upiId?: string;
   merchantName?: string;
@@ -147,7 +148,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   // Update Settings (Establishment Type & Delivery Fee)
   fastify.patch<{ Params: { id: string }; Body: UpdateSettingsBody }>('/api/restaurants/:id/settings', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
-    const { establishmentType, roomServiceFee, upiId, merchantName } = request.body;
+    const { establishmentType, paymentMode, roomServiceFee, upiId, merchantName } = request.body;
 
     if (request.user!.restaurantId !== id) {
       return reply.code(403).send({ error: 'Forbidden: Cannot update settings for a different restaurant' });
@@ -159,6 +160,9 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
 
     try {
       const data: any = { establishmentType };
+      if (paymentMode !== undefined) {
+        data.paymentMode = paymentMode;
+      }
       if (roomServiceFee !== undefined) {
         data.roomServiceFee = roomServiceFee;
       }
@@ -178,6 +182,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
       io.emit('establishmentSettingsChanged', { 
         restaurantId: id, 
         establishmentType,
+        paymentMode: updatedRestaurant.paymentMode,
         roomServiceFee: updatedRestaurant.roomServiceFee,
         upiId: updatedRestaurant.upiId,
         merchantName: updatedRestaurant.merchantName

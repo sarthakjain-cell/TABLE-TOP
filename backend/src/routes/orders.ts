@@ -239,6 +239,24 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       io.to(sessionRoom).emit('orderStatusUpdated', { orderId: id, status });
       io.emit('orderStatusUpdated', { orderId: id, status });
 
+      if (status === 'NEW') {
+        io.emit('newOrderReceived', {
+          order: {
+            id: updatedOrder.id,
+            status: 'NEW',
+            tableNumber: order.session.table.number,
+            restaurantId: order.session.table.restaurant.id,
+            items: updatedOrder.items.map(i => ({
+              id: i.id,
+              name: i.menuItem.name,
+              quantity: new Decimal(i.quantity.toString()).toNumber(),
+              modifications: i.modifications
+            })),
+            createdAt: updatedOrder.createdAt
+          }
+        });
+      }
+
       // Special alert broadcast for self-service pickup triggers
       if (status === 'READY_TO_SERVE' && restaurantMode === 'SELF_SERVICE') {
         io.to(sessionRoom).emit('pickupReady', {

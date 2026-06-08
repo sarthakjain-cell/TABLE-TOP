@@ -239,6 +239,7 @@ async function getTableSessionSyncData(sessionId: string) {
     tableId: session.tableId,
     tableNumber: session.table.number,
     restaurantMode: session.table.restaurant.operationalMode,
+    paymentMode: session.table.restaurant.paymentMode,
     cart: {
       items: cartItems,
       subtotal: cartSubtotal.toFixed(2)
@@ -445,7 +446,11 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
               },
               session: {
                 include: {
-                  table: true
+                  table: {
+                    include: {
+                      restaurant: true
+                    }
+                  }
                 }
               }
             }
@@ -462,10 +467,13 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
             }
           }
 
-          // Transition order state from PENDING to NEW
+          const isPrePay = pendingOrder.session.table.restaurant.paymentMode === 'PRE_PAY';
+          const targetStatus = isPrePay ? 'PAYMENT_PENDING' : 'NEW';
+
+          // Transition order state
           const updatedOrder = await tx.order.update({
             where: { id: pendingOrder.id },
-            data: { status: 'NEW' },
+            data: { status: targetStatus },
             include: {
               items: {
                 include: {
@@ -488,24 +496,36 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
         // Broadcast empty cart for next round, and the active order status update
         const emptyCart = { sessionId, items: [], subtotal: '0.00' };
         ioInstance.to(sessionRoom).emit('cartUpdated', { sessionId, cart: emptyCart });
-        ioInstance.to(sessionRoom).emit('orderStatusUpdated', { orderId: order.updatedOrder.id, status: 'NEW' });
+        ioInstance.to(sessionRoom).emit('orderStatusUpdated', { orderId: order.updatedOrder.id, status: order.updatedOrder.status });
 
-        // Trigger Audio-Visual kitchen alert with ticket details
-        ioInstance.emit('newOrderReceived', {
-          order: {
-            id: order.updatedOrder.id,
-            status: 'NEW',
+        if (order.updatedOrder.status === 'NEW') {
+          // Trigger Audio-Visual kitchen alert with ticket details ONLY if it bypasses PRE_PAY
+          ioInstance.emit('newOrderReceived', {
+            order: {
+              id: order.updatedOrder.id,
+              status: 'NEW',
+              tableNumber: order.tableNumber,
+              restaurantId: order.restaurantId,
+              items: order.updatedOrder.items.map(i => ({
+                id: i.id,
+                name: i.menuItem.name,
+                quantity: new Decimal(i.quantity.toString()).toNumber(),
+                modifications: i.modifications
+              })),
+              createdAt: order.updatedOrder.createdAt
+            }
+          });
+        } else if (order.updatedOrder.status === 'PAYMENT_PENDING') {
+          // Notify the Waiter Dashboard that an order requires manual payment verification
+          ioInstance.emit('helpRequested', {
             tableNumber: order.tableNumber,
-            restaurantId: order.restaurantId,
-            items: order.updatedOrder.items.map(i => ({
-              id: i.id,
-              name: i.menuItem.name,
-              quantity: new Decimal(i.quantity.toString()).toNumber(),
-              modifications: i.modifications
-            })),
-            createdAt: order.updatedOrder.createdAt
-          }
-        });
+            requestType: 'PAYMENT_VERIFICATION',
+            metadata: {
+              orderId: order.updatedOrder.id,
+              amountToVerify: 'Full Cart' // Can be refined later with exact math
+            }
+          });
+        }
 
         if (callback) callback({ success: true });
       } catch (err: any) {
