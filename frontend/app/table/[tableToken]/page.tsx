@@ -292,8 +292,24 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         }
         
         const resData = await response.json();
-        addDebugLog('pay-split success! Transaction ID: ' + resData.transaction?.id);
-        setCompletedTransactionId(resData.transaction?.id || null);
+        const newTxId = resData.transaction?.id || null;
+        addDebugLog('pay-split success! Transaction ID: ' + newTxId);
+        setCompletedTransactionId(newTxId);
+
+        // Automatically trigger WhatsApp receipt since we already have their phone number!
+        if (newTxId && customerPhone) {
+          addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
+          try {
+            await fetch('/api/receipt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
+            });
+            addDebugLog('Receipt sent successfully');
+          } catch (err) {
+            addDebugLog('Failed to auto-send receipt');
+          }
+        }
       }
 
       setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
@@ -976,55 +992,29 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             {checkoutMode === 'SUCCESS' && (
               <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-4 backdrop-blur-md animate-fade-in">
                 <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6 text-center">
-                  <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    <span className="text-4xl">✅</span>
+                  <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <span className="text-5xl">✅</span>
                   </div>
                   <h2 className="text-3xl font-black text-gray-900 tracking-tight">Payment Successful</h2>
-                  <p className="text-gray-500 font-medium leading-relaxed">Your order has been placed and paid successfully.</p>
+                  <p className="text-gray-500 font-medium leading-relaxed text-lg">Your order has been paid completely.</p>
                   
-                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-6">
-                    <p className="text-sm font-bold text-gray-800 mb-3 text-left">Receive your digital bill & future discounts on WhatsApp:</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="tel"
-                        placeholder="+91 Mobile Number"
-                        value={receiptPhone}
-                        onChange={(e) => setReceiptPhone(e.target.value)}
-                        className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 font-bold text-gray-900"
-                      />
-                      <button
-                        disabled={sendingReceipt || !receiptPhone}
-                        onClick={async () => {
-                          setSendingReceipt(true);
-                          try {
-                            await fetch('/api/receipt', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ phone: receiptPhone, transactionId: completedTransactionId })
-                            });
-                            alert('Receipt sent to WhatsApp!');
-                            setCheckoutMode('IDLE');
-                            setActiveTab('orders');
-                          } catch (err) {
-                            alert('Failed to send receipt');
-                          } finally {
-                            setSendingReceipt(false);
-                          }
-                        }}
-                        className="bg-green-500 hover:bg-green-600 text-white font-black px-6 rounded-xl disabled:opacity-50 transition active:scale-95"
-                      >
-                        {sendingReceipt ? '...' : 'Send'}
-                      </button>
-                    </div>
+                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mt-6 shadow-inner">
+                    <p className="text-green-800 font-extrabold flex items-center justify-center gap-2 text-lg">
+                      <span>📱</span> Receipt Sent via WhatsApp!
+                    </p>
+                    <p className="text-green-600 text-sm mt-2 font-medium">
+                      We've automatically sent your digital bill to {customerPhone}.
+                    </p>
                   </div>
+                  
                   <button
                     onClick={() => {
                       setCheckoutMode('IDLE');
                       setActiveTab('orders');
                     }}
-                    className="w-full mt-4 text-gray-400 hover:text-gray-600 font-bold text-sm uppercase tracking-wider py-3"
+                    className="w-full bg-gray-900 hover:bg-gray-800 text-white font-black px-6 py-4 rounded-xl transition active:scale-95 text-lg shadow-lg mt-4"
                   >
-                    Skip
+                    Done
                   </button>
                 </div>
               </div>
