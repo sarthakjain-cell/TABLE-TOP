@@ -74,7 +74,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       // Check if ALL of the waiting orders have transitioned OUT of PAYMENT_PENDING
       const areAllApproved = waitingOrderIds.every(orderId => {
         const order = tableSession.orders.find(o => o.orderId === orderId);
-        return order && order.status !== 'PAYMENT_PENDING';
+        return order && (order.status as string) !== 'PAYMENT_PENDING';
       });
 
       if (areAllApproved) {
