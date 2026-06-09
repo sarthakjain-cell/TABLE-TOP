@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
 import dynamic from 'next/dynamic';
+import Script from 'next/script';
 import { CheckCircle, Users } from 'lucide-react';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
@@ -292,48 +293,69 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         }
         
         const resData = await response.json();
-        const newTxId = resData.transaction?.id || null;
+        const newTxId = resData.transactionId || resData.transaction?.id || null;
+        const razorpayOrderId = resData.razorpayOrderId;
+        const amountInPaise = resData.amount;
+        
         addDebugLog('pay-split success! Transaction ID: ' + newTxId);
         setCompletedTransactionId(newTxId);
 
-        // Automatically trigger WhatsApp receipt since we already have their phone number!
-        if (newTxId && customerPhone) {
-          addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
-          try {
-            await fetch('/api/receipt', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
-            });
-            addDebugLog('Receipt sent successfully');
-          } catch (err) {
-            addDebugLog('Failed to auto-send receipt');
-          }
+        if (paymentMethod === 'CASH') {
+          // Skip Razorpay for CASH
+          setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
+          setShowUpiOptions(false);
+          setCheckoutMode('SUCCESS');
+          setPaymentProcessing(false);
+          return;
         }
+
+        // Initialize Razorpay
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_123', // Falls back if env is missing
+          amount: amountInPaise,
+          currency: "INR",
+          name: restaurant?.name || "Table Top",
+          description: "Order Payment",
+          order_id: razorpayOrderId,
+          handler: async function (response: any) {
+            addDebugLog('Razorpay Payment Success: ' + response.razorpay_payment_id);
+            // Automatically trigger WhatsApp receipt
+            if (newTxId && customerPhone) {
+              addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
+              try {
+                await fetch('/api/receipt', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
+                });
+              } catch (err) {
+                addDebugLog('Failed to auto-send receipt');
+              }
+            }
+            
+            setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
+            setShowUpiOptions(false);
+            setCheckoutMode('SUCCESS');
+          },
+          prefill: {
+            name: customerName,
+            contact: customerPhone
+          },
+          theme: {
+            color: "#F97316"
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (response: any) {
+           addDebugLog('Razorpay Payment Failed: ' + response.error.description);
+           setPaymentProcessing(false);
+        });
+        rzp.open();
       }
 
-      setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
-      setShowUpiOptions(false);
-      
-      if (paymentMethod === 'UPI' && tableSession?.paymentMode === 'PRE_PAY' && !isHotel) {
-        addDebugLog('Executing PRE_PAY Waiter flow');
-        const payloadItemIds = getFullUnpaidItemsPayload().map(i => i.orderItemId);
-        const paidOrderIds = tableSession.orders
-          .filter(o => o.items.some((i: any) => payloadItemIds.includes(i.orderItemId)))
-          .map(o => o.orderId);
-        
-        setWaitingOrderIds(paidOrderIds);
-        setWaitingForWaiterApproval(true);
-        setCheckoutMode('IDLE');
-        setActiveTab('orders');
-      } else {
-        addDebugLog('Setting checkoutMode to SUCCESS for POST_PAY');
-        setCheckoutMode('SUCCESS');
-      }
     } catch (err: any) {
       addDebugLog('PAYMENT ERROR: ' + (err.message || 'Payment execution failed'));
-      setPaymentProcessing(false);
-    } finally {
       setPaymentProcessing(false);
     }
   };
@@ -386,6 +408,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative shadow-2xl pb-24">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       {/* 1. Contextual Mode Header */}
       <header className="bg-white border-b sticky top-0 z-40 p-4 shadow-sm">
         <div className="flex items-center justify-between">
@@ -783,63 +806,25 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 font-bold text-gray-900 placeholder-gray-400"
                   />
                   
-                  {!showUpiOptions ? (
+                  {!showUpiOptions && (
                     <>
                       <button
-                        onClick={() => setShowUpiOptions(true)}
-                        disabled={!customerName}
+                        onClick={() => executeCheckout('UPI')}
+                        disabled={!customerName || paymentProcessing}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-indigo-600/30 disabled:opacity-50 mt-2 text-lg tracking-tight flex items-center justify-center gap-2"
                       >
-                        💸 Pay via UPI
+                        💸 {paymentProcessing ? 'Processing...' : 'Pay via UPI / Cards'}
                       </button>
                       <button
                         onClick={() => executeCheckout('CASH')}
-                        disabled={!customerName}
+                        disabled={!customerName || paymentProcessing}
                         className="w-full bg-white text-gray-700 border-2 border-gray-200 font-black py-5 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition-transform disabled:opacity-50 text-lg tracking-tight flex items-center justify-center gap-2"
                       >
                         💵 Pay Cash / Card to Waiter
                       </button>
                     </>
-                  ) : (
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center animate-fade-in space-y-6 mt-4">
-                      <div className="text-center">
-                        <h3 className="font-extrabold text-gray-900 text-lg">Scan to Pay</h3>
-                        <p className="text-gray-500 text-sm font-medium mt-1">₹{grandTotal.toFixed(2)} to {restaurant?.merchantName}</p>
-                      </div>
-                      
-                      <div className="p-2 bg-white rounded-xl border-4 border-indigo-100 shadow-inner">
-                        <QRCodeSVG
-                          value={upiString}
-                          size={200}
-                          level="H"
-                          includeMargin={false}
-                        />
-                      </div>
-                      
-                      <div className="w-full space-y-3">
-                         <a 
-                           href={upiString}
-                           className="w-full bg-indigo-50 text-indigo-700 border-2 border-indigo-200 font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-100 active:scale-[0.99] transition"
-                         >
-                           Pay via GPay / PhonePe / Paytm
-                         </a>
-                         
-                         <button
-                           onClick={() => executeCheckout('UPI')}
-                           className="w-full bg-emerald-600 text-white font-extrabold py-3.5 rounded-xl shadow-md hover:bg-emerald-700 active:scale-[0.99] transition flex items-center justify-center gap-2"
-                         >
-                           ✅ I Have Paid
-                         </button>
-                         
-                         <button
-                           onClick={() => setShowUpiOptions(false)}
-                           className="w-full text-gray-500 font-semibold py-2 text-sm hover:text-gray-700 transition"
-                         >
-                           Back to payment options
-                         </button>
-                      </div>
-                    </div>
                   )}
+
 
                   <button 
                     onClick={() => setCheckoutMode('CHOICE')} 
