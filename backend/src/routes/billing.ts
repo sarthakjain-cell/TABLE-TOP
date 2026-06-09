@@ -22,6 +22,12 @@ interface CheckoutCartBody {
   customerPhone?: string;
 }
 
+interface PayCustomAmountBody {
+  customerName?: string;
+  customerPhone?: string;
+  amountToPay: number;
+}
+
 export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   fastify.get<{ Params: { id: string } }>('/api/transactions/:id', async (request, reply) => {
     try {
@@ -316,6 +322,147 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   });
 
   // Hotel Mode Cart Checkout (processes payment, applies delivery fee, and transitions PENDING cart to NEW order)
+    fastify.post<{ Params: { sessionId: string }; Body: PayCustomAmountBody }>('/api/sessions/:sessionId/pay-custom-amount', async (request, reply) => {
+    const { sessionId } = request.params;
+    const { amountToPay, customerName, customerPhone } = request.body;
+
+    if (!amountToPay || amountToPay <= 0) {
+      return reply.code(400).send({ error: 'Invalid payment amount' });
+    }
+
+    try {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        include: {
+          table: { include: { restaurant: true } },
+          orders: { include: { items: { include: { menuItem: true } } } },
+          transactions: { where: { status: 'COMPLETED' }, include: { paymentItems: true } }
+        }
+      });
+
+      if (!session || session.status === 'CLOSED') {
+        return reply.code(400).send({ error: 'Invalid or closed session' });
+      }
+
+      const taxRate = new Decimal(session.table.restaurant.taxRate.toString());
+
+      // Track paid item quantities
+      const paidQuantityMap = new Map<string, Decimal>();
+      session.transactions.forEach(tx => {
+        tx.paymentItems.forEach(pi => {
+          const currentPaid = paidQuantityMap.get(pi.orderItemId) || new Decimal(0);
+          paidQuantityMap.set(pi.orderItemId, currentPaid.add(new Decimal(pi.quantityPaid.toString())));
+        });
+      });
+
+      let amountRemainingToAllocate = new Decimal(amountToPay.toString());
+      const transactionItemsPayload: any[] = [];
+      let totalTaxAllocated = new Decimal(0);
+
+      for (const order of session.orders) {
+        if (order.status === 'PENDING') continue;
+        if (amountRemainingToAllocate.lte(0)) break;
+
+        for (const item of order.items) {
+          if (amountRemainingToAllocate.lte(0)) break;
+
+          const paidQty = paidQuantityMap.get(item.id) || new Decimal(0);
+          const orderedQty = new Decimal(item.quantity.toString());
+          const unpaidQty = Decimal.max(0, orderedQty.sub(paidQty));
+
+          if (unpaidQty.gt(0)) {
+            const price = new Decimal(item.price.toString());
+            // Value of this specific unpaid quantity including tax
+            const itemUnpaidValue = price.mul(unpaidQty).mul(new Decimal(1).add(taxRate));
+
+            if (itemUnpaidValue.lte(amountRemainingToAllocate)) {
+              // We can fully pay off this item
+              const taxFraction = price.mul(unpaidQty).mul(taxRate).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+              transactionItemsPayload.push({
+                orderItemId: item.id,
+                quantityPaid: unpaidQty,
+                amount: price.mul(unpaidQty),
+                taxFraction
+              });
+              totalTaxAllocated = totalTaxAllocated.add(taxFraction);
+              amountRemainingToAllocate = amountRemainingToAllocate.sub(itemUnpaidValue);
+            } else {
+              // We can only partially pay off this item
+              const principalAmount = amountRemainingToAllocate.div(new Decimal(1).add(taxRate));
+              const qtyToPay = principalAmount.div(price); // fractional quantity
+
+              const taxFraction = amountRemainingToAllocate.sub(principalAmount).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+              
+              transactionItemsPayload.push({
+                orderItemId: item.id,
+                quantityPaid: qtyToPay.toDecimalPlaces(4, Decimal.ROUND_HALF_UP),
+                amount: principalAmount.toDecimalPlaces(4, Decimal.ROUND_HALF_UP),
+                taxFraction
+              });
+              totalTaxAllocated = totalTaxAllocated.add(taxFraction);
+              amountRemainingToAllocate = new Decimal(0);
+            }
+          }
+        }
+      }
+
+      if (transactionItemsPayload.length === 0) {
+         return reply.code(400).send({ error: 'No unpaid items remaining to allocate payment to' });
+      }
+
+      // Initialize Razorpay
+      const razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID!,
+        key_secret: process.env.RAZORPAY_KEY_SECRET!
+      });
+
+      // Create Razorpay Order
+      const amountInPaise = Math.round(Number(amountToPay) * 100);
+      const razorpayOrder = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `receipt_${Date.now()}`
+      });
+
+      // Create the Transaction as PENDING
+      const transaction = await prisma.transaction.create({
+        data: {
+          sessionId,
+          amount: new Decimal(amountToPay.toString()),
+          taxPaid: totalTaxAllocated.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+          status: 'PENDING',
+          razorpayOrderId: razorpayOrder.id,
+          customerName,
+          customerPhone,
+          paymentItems: {
+            create: transactionItemsPayload.map(item => ({
+              orderItemId: item.orderItemId,
+              quantityPaid: item.quantityPaid,
+              amount: item.amount,
+              taxFraction: item.taxFraction
+            }))
+          }
+        },
+        include: {
+          paymentItems: true
+        }
+      });
+
+      return {
+        transactionId: transaction.id,
+        razorpayOrderId: razorpayOrder.id,
+        amount: amountInPaise,
+        currency: "INR"
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to process custom amount payment' });
+    }
+  });
+
+
+
+  // Hotel Mode Cart Checkout
   fastify.post<{ Params: { sessionId: string }; Body: CheckoutCartBody }>('/api/sessions/:sessionId/checkout-cart', async (request, reply) => {
     const { sessionId } = request.params;
     const { customerName, customerPhone } = request.body;
