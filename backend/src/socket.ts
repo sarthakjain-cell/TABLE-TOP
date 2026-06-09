@@ -524,7 +524,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
               orderId: order.updatedOrder.id,
               amountToVerify: 'Full Cart' // Can be refined later with exact math
             }
-          });
+          } as any);
         }
 
         if (callback) callback({ success: true });
