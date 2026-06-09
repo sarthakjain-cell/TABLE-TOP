@@ -89,11 +89,14 @@ export const receiptRoutes = async (fastify: FastifyInstance) => {
       const responseData = await response.json();
 
       if (!response.ok) {
-        fastify.log.error('WhatsApp API Error:', responseData);
-        throw new Error(responseData.error?.message || 'Failed to send WhatsApp message via Meta API');
+        fastify.log.error('WhatsApp API Error:', responseData as any);
+        if ((responseData as any).error) {
+          throw new Error('WhatsApp API: ' + (responseData as any).error.message);
+        }
+        throw new Error('WhatsApp API failed with status ' + response.status + ' - ' + JSON.stringify(responseData));
       }
 
-      fastify.log.info(`WhatsApp Receipt Sent! Message ID: ${responseData.messages?.[0]?.id}`);
+      fastify.log.info(`WhatsApp Receipt Sent! Message ID: ${(responseData as any).messages?.[0]?.id}`);
 
       return { success: true, message: 'Receipt sent successfully via WhatsApp' };
     } catch (error) {
