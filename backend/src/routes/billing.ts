@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '../prisma';
 import { Decimal } from 'decimal.js';
 import { getIO } from '../socket';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 interface SplitPaymentItem {
   orderItemId: string;
@@ -261,132 +263,51 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
       const totalGrand = transactionSubtotal.add(transactionTax).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
-      // Create the Transaction and OrderItemPayment links atomically
-      const transaction = await prisma.$transaction(async (tx) => {
-        const createdTx = await tx.transaction.create({
-          data: {
-            sessionId,
-            amount: totalGrand,
-            taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
-            status: 'COMPLETED',
-            customerName,
-            customerPhone,
-            paymentItems: {
-              create: transactionItemsPayload.map(item => ({
-                orderItemId: item.orderItemId,
-                quantityPaid: item.quantityPaid,
-                amount: item.amount,
-                taxFraction: item.taxFraction
-              }))
-            }
-          },
-          include: {
-            paymentItems: true
-          }
-        });
-
-        // Re-evaluate if the session has now been fully paid out
-        const allCompletedTxs = await tx.transaction.findMany({
-          where: { sessionId, status: 'COMPLETED' },
-          include: { paymentItems: true }
-        });
-
-        const updatedPaidQuantityMap = new Map<string, Decimal>();
-        allCompletedTxs.forEach(ctx => {
-          ctx.paymentItems.forEach(pi => {
-            const currentPaid = updatedPaidQuantityMap.get(pi.orderItemId) || new Decimal(0);
-            updatedPaidQuantityMap.set(pi.orderItemId, currentPaid.add(new Decimal(pi.quantityPaid.toString())));
-          });
-        });
-
-        // Check if every ordered item has been completely paid
-        let isFullyPaid = true;
-        session.orders.forEach(order => {
-          if (order.status === 'PENDING') return; // Ignore carts
-          order.items.forEach(item => {
-            const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
-            const qtyOrdered = new Decimal(item.quantity.toString());
-            if (qtyPaid.lt(qtyOrdered)) {
-              isFullyPaid = false;
-            }
-          });
-        });
-
-        // If completely settled AND we are in POST_PAY mode, automatically close the session and vacate the table
-        // (In PRE_PAY, they pay upfront before receiving food, so we leave the session open)
-        if (isFullyPaid && session.table.restaurant.paymentMode === 'POST_PAY') {
-          await tx.session.update({
-            where: { id: sessionId },
-            data: {
-              status: 'CLOSED',
-              closedAt: new Date()
-            }
-          });
-
-          await tx.table.update({
-            where: { id: session.tableId },
-            data: { status: 'VACANT' }
-          });
-        }
-
-        if (paymentMethod) {
-          const affectedOrderIds = new Set<string>();
-          for (const item of transactionItemsPayload) {
-            const orderItem = orderedItemsMap.get(item.orderItemId);
-            if (orderItem) affectedOrderIds.add(orderItem.orderId);
-          }
-          await tx.order.updateMany({
-            where: { id: { in: Array.from(affectedOrderIds) } },
-            data: { paymentMethod }
-          });
-        }
-
-        return {
-          createdTx,
-          isFullyPaid,
-          affectedOrderIds: paymentMethod ? Array.from(
-            new Set(transactionItemsPayload.map(i => orderedItemsMap.get(i.orderItemId)?.orderId).filter(Boolean))
-          ) : []
-        };
+      // Initialize Razorpay
+      const razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID!,
+        key_secret: process.env.RAZORPAY_KEY_SECRET!
       });
 
-      // Emit Table Vacant broadcast on full checkout only for POST_PAY
-      if (transaction.isFullyPaid && session.table.restaurant.paymentMode === 'POST_PAY') {
-        const io = getIO();
-        io.emit('helpRequested', {
-          tableNumber: session.table.number,
-          requestType: 'CHECKOUT_COMPLETE'
-        });
-        io.to(`session:${sessionId}`).emit('orderStatusUpdated', {
-          orderId: 'SESSION_COMPLETE',
-          status: 'COMPLETED'
-        });
-      }
+      // Create Razorpay Order
+      const amountInPaise = Math.round(totalGrand.toNumber() * 100);
+      const razorpayOrder = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `receipt_${Date.now()}`
+      });
 
-      // Re-fetch affected orders to broadcast the updated paymentMethod to the Kitchen
-      if (paymentMethod && transaction.affectedOrderIds.length > 0) {
-        const io = getIO();
-        for (const orderId of transaction.affectedOrderIds) {
-          const updatedOrder = await prisma.order.findUnique({
-            where: { id: orderId },
-            include: { items: { include: { menuItem: true } } }
-          });
-          if (updatedOrder) {
-             io.emit('orderStatusUpdated', {
-                orderId: updatedOrder.id,
-                status: updatedOrder.status,
-                paymentMethod: updatedOrder.paymentMethod || undefined
-             });
+      // Create the Transaction as PENDING
+      const transaction = await prisma.transaction.create({
+        data: {
+          sessionId,
+          amount: totalGrand,
+          taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+          status: 'PENDING',
+          razorpayOrderId: razorpayOrder.id,
+          customerName,
+          customerPhone,
+          paymentItems: {
+            create: transactionItemsPayload.map(item => ({
+              orderItemId: item.orderItemId,
+              quantityPaid: item.quantityPaid,
+              amount: item.amount,
+              taxFraction: item.taxFraction
+            }))
           }
+        },
+        include: {
+          paymentItems: true
         }
-      }
+      });
+
+      // We do NOT mark Orders or Session as completed here. The webhook will handle it.
 
       return {
-        transaction: transaction.createdTx,
-        sessionFullyPaid: transaction.isFullyPaid,
-        paidSubtotal: transactionSubtotal.toFixed(2),
-        paidTax: transactionTax.toFixed(2),
-        paidGrandTotal: totalGrand.toFixed(2)
+        transactionId: transaction.id,
+        razorpayOrderId: razorpayOrder.id,
+        amount: amountInPaise,
+        currency: "INR"
       };
     } catch (error) {
       fastify.log.error(error);
@@ -648,6 +569,115 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     } catch (error: any) {
       fastify.log.error(error);
       return reply.code(400).send({ error: error.message || 'Failed to checkout directly' });
+    }
+  });
+
+  // Razorpay Webhook Endpoint
+  fastify.post('/api/webhook/razorpay', async (request, reply) => {
+    try {
+      const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+      if (!secret) return reply.code(500).send({ error: 'Webhook secret not configured' });
+
+      const signature = request.headers['x-razorpay-signature'] as string;
+      if (!signature) return reply.code(400).send({ error: 'Missing signature' });
+
+      // Verify signature using crypto HMAC-SHA256
+      const payload = JSON.stringify(request.body);
+      const expectedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+      if (expectedSignature !== signature) {
+        // Fastify's JSON.stringify might reorder keys. If it fails, log and reject.
+        fastify.log.warn(`Webhook signature mismatch. Expected: ${expectedSignature}, Got: ${signature}`);
+        return reply.code(400).send({ error: 'Invalid signature' });
+      }
+
+      const event = request.body as any;
+
+      if (event.event === 'payment.captured' || event.event === 'order.paid') {
+        const paymentData = event.payload.payment.entity;
+        const razorpayOrderId = paymentData.order_id;
+
+        // Find the transaction
+        const transaction = await prisma.transaction.findUnique({
+          where: { razorpayOrderId: razorpayOrderId },
+          include: { 
+            session: { 
+              include: { 
+                table: { include: { restaurant: true } }, 
+                orders: { include: { items: true } } 
+              } 
+            }, 
+            paymentItems: true 
+          }
+        });
+
+        if (transaction && transaction.status === 'PENDING') {
+          await prisma.$transaction(async (tx) => {
+            await tx.transaction.update({
+              where: { id: transaction.id },
+              data: {
+                status: 'COMPLETED',
+                razorpayPaymentId: paymentData.id,
+                razorpaySignature: signature
+              }
+            });
+
+            // Update session status if fully paid
+            const session = transaction.session;
+            const allCompletedTxs = await tx.transaction.findMany({
+              where: { sessionId: session.id, status: 'COMPLETED' },
+              include: { paymentItems: true }
+            });
+
+            const updatedPaidQuantityMap = new Map<string, Decimal>();
+            allCompletedTxs.forEach(ctx => {
+              ctx.paymentItems.forEach(pi => {
+                const currentPaid = updatedPaidQuantityMap.get(pi.orderItemId) || new Decimal(0);
+                updatedPaidQuantityMap.set(pi.orderItemId, currentPaid.add(new Decimal(pi.quantityPaid.toString())));
+              });
+            });
+
+            let isFullyPaid = true;
+            session.orders.forEach(order => {
+              if (order.status === 'PENDING') return;
+              order.items.forEach(item => {
+                const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
+                const qtyOrdered = new Decimal(item.quantity.toString());
+                if (qtyPaid.lt(qtyOrdered)) {
+                  isFullyPaid = false;
+                }
+              });
+            });
+
+            if (isFullyPaid && session.table.restaurant.paymentMode === 'POST_PAY') {
+              await tx.session.update({
+                where: { id: session.id },
+                data: { status: 'CLOSED', closedAt: new Date() }
+              });
+              await tx.table.update({
+                where: { id: session.tableId },
+                data: { status: 'VACANT' }
+              });
+
+              // Fire WebSocket KDS events
+              const io = getIO();
+              io.emit('helpRequested', {
+                tableNumber: session.table.number,
+                requestType: 'CHECKOUT_COMPLETE'
+              });
+              io.to(`session:${session.id}`).emit('orderStatusUpdated', {
+                orderId: 'SESSION_COMPLETE',
+                status: 'COMPLETED'
+              });
+            }
+          });
+        }
+      }
+
+      return reply.code(200).send({ status: 'ok' });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Webhook processing failed' });
     }
   });
 };

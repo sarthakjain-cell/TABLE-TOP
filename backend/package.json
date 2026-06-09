@@ -23,6 +23,7 @@
     "decimal.js": "^10.4.3",
     "fastify": "^4.27.0",
     "node-cache": "^5.1.2",
+    "razorpay": "^2.9.6",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {

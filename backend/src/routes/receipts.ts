@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../index';
+import { prisma } from '../prisma';
 
 interface ReceiptBody {
   phone: string;
@@ -71,7 +71,7 @@ export const receiptRoutes = async (fastify: FastifyInstance) => {
           template: {
             // NOTE: You MUST create an approved template named 'digital_receipt' in your Meta Dashboard
             name: 'digital_receipt',
-            language: { code: 'en_US' },
+            language: { code: 'en' },
             components: [
               {
                 type: 'body',

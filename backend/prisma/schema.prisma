@@ -152,6 +152,9 @@ model Transaction {
   customerName       String?            // Metadata tracking for split billing
   customerPhone      String?            // Metadata tracking for split billing
   deliveryFeeApplied Decimal            @db.Decimal(10, 2) @default(0.00)
+  razorpayOrderId    String?            @unique
+  razorpayPaymentId  String?            @unique
+  razorpaySignature  String?
   paymentItems       OrderItemPayment[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
