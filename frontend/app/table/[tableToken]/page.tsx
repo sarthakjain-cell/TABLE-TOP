@@ -1011,40 +1011,95 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         {splitLobby && !splitLobby.isComplete && (
           <div className="fixed inset-0 bg-slate-900/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in">
             <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-              {localClaimedSplitId ? (() => {
+                            {localClaimedSplitId ? (() => {
                 const mySplit = splitLobby.splits.find(s => s.id === localClaimedSplitId);
                 if (!mySplit) return null;
                 
-                // Construct UPI Intent String
-                const merchantVpa = restaurant?.upiId || 'test@upi';
-                const merchantName = encodeURIComponent(restaurant?.merchantName || restaurant?.name || 'Restaurant');
-                const upiString = `upi://pay?pa=${merchantVpa}&pn=${merchantName}&am=${mySplit.amount.toFixed(2)}&cu=INR`;
+                const handleRazorpaySplit = async () => {
+                  if (!tableSession?.sessionId) return;
+                  setPaymentProcessing(true);
+                  try {
+                    const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-custom-amount`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        customerName: customerName || mySplit.name,
+                        customerPhone: customerPhone || '9999999999',
+                        amountToPay: mySplit.amount
+                      })
+                    });
+                    
+                    if (!response.ok) {
+                      const errData = await response.json();
+                      throw new Error(errData.error || 'Payment failed');
+                    }
+                    
+                    const resData = await response.json();
+                    
+                    const options = {
+                      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_123',
+                      amount: resData.amount,
+                      currency: "INR",
+                      name: restaurant?.name || "Table Top",
+                      description: `Split Payment for ${mySplit.name}`,
+                      order_id: resData.razorpayOrderId,
+                      handler: function (razorpayResponse: any) {
+                        socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
+                        setLocalClaimedSplitId(null);
+                        setPaymentProcessing(false);
+                      },
+                      prefill: {
+                        name: customerName || mySplit.name,
+                        contact: customerPhone || ''
+                      },
+                      theme: {
+                        color: "#4f46e5"
+                      },
+                      modal: {
+                        ondismiss: function() {
+                          setPaymentProcessing(false);
+                        }
+                      }
+                    };
+                    
+                    const rzp = new (window as any).Razorpay(options);
+                    rzp.on('payment.failed', function (response: any) {
+                      alert(response.error.description || 'Payment failed');
+                      setPaymentProcessing(false);
+                    });
+                    rzp.open();
+                  } catch (error: any) {
+                    alert(error.message);
+                    setPaymentProcessing(false);
+                  }
+                };
                 
                 return (
                   <div className="text-center space-y-6">
                     <h3 className="text-2xl font-black text-gray-800">Pay Your Share</h3>
                     <p className="text-gray-500 font-medium">Paying ₹{mySplit.amount.toFixed(2)} for {mySplit.name}</p>
                     
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border-2 border-indigo-100 inline-block mx-auto">
-                       <QRCodeSVG value={upiString} size={200} level="H" />
-                    </div>
-                    
-                    <a href={upiString} className="block w-full py-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-black rounded-xl transition-colors sm:hidden border border-indigo-200">
-                      Open UPI App
-                    </a>
+                    <button 
+                      onClick={handleRazorpaySplit}
+                      disabled={paymentProcessing}
+                      className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {paymentProcessing ? 'Processing...' : 'Pay via Razorpay'}
+                    </button>
                     
                     <button 
                       onClick={() => {
-                        socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
                         setLocalClaimedSplitId(null);
                       }}
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform"
+                      disabled={paymentProcessing}
+                      className="w-full text-gray-500 hover:text-gray-700 font-bold py-2 text-sm uppercase tracking-widest"
                     >
-                      I Have Sent the UPI
+                      Cancel
                     </button>
                   </div>
                 );
               })() : (
+
                 <div className="space-y-6">
                    <h3 className="text-2xl font-black text-gray-800 text-center mb-4">Multiplayer Split</h3>
                    <div className="space-y-3">
