@@ -89,6 +89,19 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     }
   }, [tableSession?.orders, waitingForWaiterApproval, waitingOrderIds]);
 
+  // Handle Android hardware back button gracefully to unclaim splits
+  useEffect(() => {
+    const handlePopState = () => {
+      if (localClaimedSplitId) {
+        socket?.emit('unclaimSplitPayment', { splitId: localClaimedSplitId });
+        setLocalClaimedSplitId(null);
+        setPaymentProcessing(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [localClaimedSplitId, socket]);
+
   useEffect(() => {
     const handleStatusUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
@@ -1105,6 +1118,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       onClick={() => {
                         socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
                         setLocalClaimedSplitId(null);
+                        window.history.back();
                       }}
                       disabled={paymentProcessing}
                       className="w-full text-gray-500 hover:text-gray-700 font-bold py-2 text-sm uppercase tracking-widest"
@@ -1134,6 +1148,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                            {split.status === 'PENDING' && (
                              <button 
                                onClick={() => {
+                                 window.history.pushState({ splitScreen: true }, '');
                                  setLocalClaimedSplitId(split.id);
                                  socket?.emit('claimSplitPayment', { splitId: split.id });
                                }}
