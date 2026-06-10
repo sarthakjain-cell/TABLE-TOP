@@ -313,7 +313,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
         // Initialize Razorpay
         const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_123', // Falls back if env is missing
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Szz1d4E7cQBqbS', // Updated fallback to new live key
           amount: amountInPaise,
           currency: "INR",
           name: restaurant?.name || "Table Top",
@@ -1040,7 +1040,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     const resData = await response.json();
                     
                     const options = {
-                      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_123',
+                      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Szz1d4E7cQBqbS',
                       amount: resData.amount,
                       currency: "INR",
                       name: restaurant?.name || "Table Top",
