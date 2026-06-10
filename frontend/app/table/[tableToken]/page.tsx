@@ -47,6 +47,28 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [showPickupAlert, setShowPickupAlert] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   
+  // Optimistic UI state for cart quantities
+  const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
+  
+  // Clear optimistic state when real server state updates
+  useEffect(() => {
+    setOptimisticQuantities({});
+  }, [tableSession?.cart?.items]);
+
+  const handleOptimisticAdd = (menuItemId: string, quantity: number, modifications: string[] = []) => {
+    const key = `${menuItemId}-${JSON.stringify(modifications)}`;
+    
+    const serverItem = tableSession?.cart?.items?.find((i: any) => i.menuItemId === menuItemId && JSON.stringify(i.modifications || []) === JSON.stringify(modifications));
+    const baseQuantity = serverItem ? serverItem.quantity : 0;
+    
+    setOptimisticQuantities(prev => ({
+      ...prev,
+      [key]: Math.max(0, (prev[key] !== undefined ? prev[key] : baseQuantity) + quantity)
+    }));
+    
+    addItemToCart(menuItemId, quantity, modifications.length > 0 ? modifications : undefined);
+  };
+  
   const addDebugLog = (msg: string) => {
     console.log(msg);
     setDebugLogs(prev => [...prev, new Date().toLocaleTimeString() + ': ' + msg]);
@@ -522,13 +544,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                           item.hasHalfPortion ? (
                             <div className="flex gap-2">
                               <button
-                                onClick={() => addItemToCart(item.id, 1)}
+                                onClick={() => handleOptimisticAdd(item.id, 1)}
                                 className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-[11px] px-3 py-2 rounded-lg uppercase transition-all active:scale-95"
                               >
                                 ADD FULL
                               </button>
                               <button
-                                onClick={() => addItemToCart(item.id, 1, ['Half Portion'])}
+                                onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
                                 className="bg-white text-blue-600 border border-blue-600 shadow-sm font-bold text-[11px] px-3 py-2 rounded-lg uppercase transition-all active:scale-95"
                               >
                                 ADD HALF
@@ -536,7 +558,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                             </div>
                           ) : (
                             <button
-                              onClick={() => addItemToCart(item.id, 1)}
+                              onClick={() => handleOptimisticAdd(item.id, 1)}
                               className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-xs px-6 py-2 rounded-lg uppercase transition-all active:scale-95"
                             >
                               ADD
@@ -565,13 +587,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         item.hasHalfPortion ? (
                           <div className="absolute bottom-[-16px] left-1/2 transform -translate-x-1/2 flex gap-1 w-full justify-center px-1">
                             <button
-                              onClick={() => addItemToCart(item.id, 1)}
+                              onClick={() => handleOptimisticAdd(item.id, 1)}
                               className="bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform flex-1 text-center"
                             >
                               FULL
                             </button>
                             <button
-                              onClick={() => addItemToCart(item.id, 1, ['Half Portion'])}
+                              onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
                               className="bg-white text-blue-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform flex-1 text-center"
                             >
                               HALF
@@ -579,7 +601,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                           </div>
                         ) : (
                           <button
-                            onClick={() => addItemToCart(item.id, 1)}
+                            onClick={() => handleOptimisticAdd(item.id, 1)}
                             className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-xs px-6 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform"
                           >
                             ADD
@@ -636,14 +658,16 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         <span className="text-sm font-extrabold text-gray-800">${item.subtotal}</span>
                         <div className="flex items-center border rounded-lg overflow-hidden">
                           <button
-                            onClick={() => addItemToCart(item.menuItemId, -1, item.modifications)}
+                            onClick={() => handleOptimisticAdd(item.menuItemId, -1, item.modifications)}
                             className="bg-gray-100 hover:bg-gray-200 px-2 py-1 text-xs font-bold"
                           >
                             -
                           </button>
-                          <span className="px-2 text-xs font-bold">{item.quantity}</span>
+                          <span className="px-2 text-xs font-bold">
+                            {optimisticQuantities[`${item.menuItemId}-${JSON.stringify(item.modifications || [])}`] ?? item.quantity}
+                          </span>
                           <button
-                            onClick={() => addItemToCart(item.menuItemId, 1, item.modifications)}
+                            onClick={() => handleOptimisticAdd(item.menuItemId, 1, item.modifications)}
                             className="bg-gray-100 hover:bg-gray-200 px-2 py-1 text-xs font-bold"
                           >
                             +
@@ -1218,8 +1242,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           <span className="text-xl">🛒</span>
           <span className="text-[10px]">Shared Cart</span>
           {tableSession.cart.items.length > 0 && (
-            <span className="absolute top-1 right-3 bg-red-500 text-white rounded-full text-[9px] w-4.5 h-4.5 flex items-center justify-center font-bold border border-white">
-              {tableSession.cart.items.reduce((acc, i) => acc + i.quantity, 0)}
+            <span className="absolute top-1 right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold border border-white text-[10px]">
+              {tableSession.cart.items.reduce((acc, i) => acc + (optimisticQuantities[`${i.menuItemId}-${JSON.stringify(i.modifications || [])}`] ?? i.quantity), 0)}
             </span>
           )}
         </button>
