@@ -577,6 +577,20 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
       }
     });
 
+    socket.on('unclaimSplitPayment', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+
+      const lobby = activeSplitLobbies.get(sessionId);
+      if (!lobby) return;
+
+      const split = lobby.splits.find((s: SplitPortion) => s.id === data.splitId);
+      if (split && split.status === 'CLAIMED') {
+        split.status = 'PENDING';
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+      }
+    });
+
     socket.on('confirmSplitPayment', (data) => {
       const sessionId = socket.data.sessionId;
       if (!sessionId) return;
