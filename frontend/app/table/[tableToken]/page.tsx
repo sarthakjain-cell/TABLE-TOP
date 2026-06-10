@@ -1103,6 +1103,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     
                     <button 
                       onClick={() => {
+                        socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
                         setLocalClaimedSplitId(null);
                       }}
                       disabled={paymentProcessing}
