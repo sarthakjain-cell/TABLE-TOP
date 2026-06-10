@@ -345,6 +345,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           },
           theme: {
             color: "#F97316"
+          },
+          modal: {
+            ondismiss: function() {
+              setPaymentProcessing(false);
+            }
           }
         };
 
@@ -1061,6 +1066,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       modal: {
                         ondismiss: function() {
                           setPaymentProcessing(false);
+                          socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
+                          setLocalClaimedSplitId(null);
                         }
                       }
                     };
@@ -1069,11 +1076,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     rzp.on('payment.failed', function (response: any) {
                       alert(response.error.description || 'Payment failed');
                       setPaymentProcessing(false);
+                      socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
+                      setLocalClaimedSplitId(null);
                     });
                     rzp.open();
                   } catch (error: any) {
                     alert(error.message);
                     setPaymentProcessing(false);
+                    socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
+                    setLocalClaimedSplitId(null);
                   }
                 };
                 
