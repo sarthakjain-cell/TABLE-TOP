@@ -24,6 +24,8 @@ interface MenuItem {
   imageUrl?: string;
 }
 
+export const dynamic = 'force-dynamic';
+
 export default function CustomerPage({ params }: { params: { tableToken: string } }) {
   const { tableToken } = params;
   const {
@@ -1018,6 +1020,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 const handleRazorpaySplit = async () => {
                   if (!tableSession?.sessionId) return;
                   setPaymentProcessing(true);
+                  console.log("Starting Razorpay custom split for amount:", mySplit.amount);
                   try {
                     const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-custom-amount`, {
                       method: 'POST',
