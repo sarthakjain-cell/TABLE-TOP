@@ -977,6 +977,50 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                 status: 'COMPLETED'
               });
             }
+            
+            // Transition PAYMENT_PENDING orders to NEW
+            const paidOrderItemIds = new Set(transaction.paymentItems.map(pi => pi.orderItemId));
+            const affectedOrders = session.orders.filter(o => 
+              o.status === 'PAYMENT_PENDING' && o.items.some(i => paidOrderItemIds.has(i.id))
+            );
+
+            for (const order of affectedOrders) {
+              await tx.order.update({
+                where: { id: order.id },
+                data: { status: 'NEW' }
+              });
+
+              const io = getIO();
+              io.to(session.restaurantId).emit('orderCreated', {
+                order: {
+                  orderId: order.id,
+                  status: 'NEW',
+                  tableNumber: session.table.number,
+                  restaurantId: session.restaurantId,
+                  paymentMethod: 'ONLINE',
+                  items: order.items.map(i => ({
+                    name: i.menuItem?.name || 'Item',
+                    quantity: new Decimal(i.quantity.toString()).toNumber(),
+                    modifications: i.modifications
+                  })),
+                  createdAt: order.createdAt,
+                  totalAmount: transaction.amount.toString()
+                }
+              });
+            }
+            
+            const updatedSession = await tx.session.findUnique({
+              where: { id: session.id },
+              include: {
+                table: { include: { restaurant: true } },
+                orders: { include: { items: { include: { menuItem: true } } } },
+                transactions: { where: { status: 'COMPLETED' }, include: { paymentItems: true } }
+              }
+            });
+            if (updatedSession) {
+              const io = getIO();
+              io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
+            }
           });
         }
       }
