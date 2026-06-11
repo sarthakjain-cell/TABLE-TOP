@@ -3,11 +3,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 import Script from 'next/script';
 import { CheckCircle, Users } from 'lucide-react';
 
-const QRCodeSVG = dynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
+const QRCodeSVG = nextDynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
   ssr: false,
   loading: () => <div className="w-[200px] h-[200px] flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl"><span className="text-sm font-bold text-gray-400">Loading QR...</span></div>
 });
@@ -113,18 +113,6 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
   // Handle Android hardware back button gracefully to unclaim splits
   useEffect(() => {
-    const handlePopState = () => {
-      if (localClaimedSplitId) {
-        socket?.emit('unclaimSplitPayment', { splitId: localClaimedSplitId });
-        setLocalClaimedSplitId(null);
-        setPaymentProcessing(false);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [localClaimedSplitId, socket]);
-
-  useEffect(() => {
     const handleStatusUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { status, orderId } = customEvent.detail;
@@ -156,6 +144,18 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
   const [splitLobby, setSplitLobby] = useState<SplitLobby | null>(null);
   const [localClaimedSplitId, setLocalClaimedSplitId] = useState<string | null>(null);
+  useEffect(() => {
+    const handlePopState = () => {
+      if (localClaimedSplitId) {
+        socket?.emit('unclaimSplitPayment', { splitId: localClaimedSplitId });
+        setLocalClaimedSplitId(null);
+        setPaymentProcessing(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [localClaimedSplitId, socket]);
+
 
   // 1. Verify token & join table room on mount
   useEffect(() => {
