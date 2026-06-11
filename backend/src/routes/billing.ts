@@ -271,8 +271,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
       // Initialize Razorpay
       const razorpay = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID!,
-        key_secret: process.env.RAZORPAY_KEY_SECRET!
+        key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_Szz1d4E7cQBqbS',
+        key_secret: process.env.RAZORPAY_KEY_SECRET || '0PQLgUWfsMW7lXYMOLk1O2mH'
       });
 
       // Create Razorpay Order
@@ -412,8 +412,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
       // Initialize Razorpay
       const razorpay = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID!,
-        key_secret: process.env.RAZORPAY_KEY_SECRET!
+        key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_Szz1d4E7cQBqbS',
+        key_secret: process.env.RAZORPAY_KEY_SECRET || '0PQLgUWfsMW7lXYMOLk1O2mH'
       });
 
       // Create Razorpay Order
