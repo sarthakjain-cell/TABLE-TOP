@@ -348,7 +348,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
         // Initialize Razorpay
         const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Szz1d4E7cQBqbS', // Updated fallback to new live key
+          key: 'rzp_live_Szz1d4E7cQBqbS', // Hardcoded to bypass Vercel old env cache
           amount: amountInPaise,
           currency: "INR",
           name: restaurant?.name || "Table Top",
