@@ -756,6 +756,18 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       if (!transaction) return reply.code(404).send({ error: 'Transaction not found' });
       
       if (transaction.status === 'COMPLETED') {
+        // Even if verified, push the updated session to the frontend so it clears the cart and moves on!
+        const updatedSession = await prisma.session.findUnique({
+          where: { id: transaction.sessionId },
+          include: {
+            table: { include: { restaurant: true } },
+            orders: { include: { items: { include: { menuItem: true } } } },
+            transactions: { where: { status: 'COMPLETED' }, include: { paymentItems: true } }
+          }
+        });
+        if (updatedSession) {
+          getIO().to(`session:${transaction.sessionId}`).emit('sessionUpdated', updatedSession);
+        }
         return reply.code(200).send({ success: true, message: 'Already verified' });
       }
 
