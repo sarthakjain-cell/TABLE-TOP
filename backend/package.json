@@ -21,6 +21,7 @@
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.10.0",
     "decimal.js": "^10.4.3",
+    "dotenv": "^17.4.2",
     "fastify": "^4.27.0",
     "node-cache": "^5.1.2",
     "razorpay": "^2.9.6",
