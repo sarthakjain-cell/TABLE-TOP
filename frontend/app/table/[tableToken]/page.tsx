@@ -377,12 +377,19 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               if (newTxId && customerPhone) {
                 addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
                 try {
-                  await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/receipt`, {
+                  const receiptRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/receipt`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
                   });
-                } catch (err) {
+                  if (!receiptRes.ok) {
+                    const errTxt = await receiptRes.text();
+                    alert('Backend receipt error: ' + errTxt);
+                  } else {
+                    addDebugLog('Receipt API returned OK!');
+                  }
+                } catch (err: any) {
+                  alert('Network error while sending receipt: ' + err.message);
                   addDebugLog('Failed to auto-send receipt');
                 }
               }
