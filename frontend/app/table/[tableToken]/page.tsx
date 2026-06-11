@@ -1082,7 +1082,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     const resData = await response.json();
                     
                     const options = {
-                      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Szz1d4E7cQBqbS',
+                      key: 'rzp_live_Szz1d4E7cQBqbS', // Hardcoded to bypass Vercel env cache
                       amount: resData.amount,
                       currency: "INR",
                       name: restaurant?.name || "Table Top",
