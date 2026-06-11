@@ -869,7 +869,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         });
         const io = getIO();
         io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
-        io.to(session.restaurantId).emit('adminStateSynced');
+        io.emit('adminStateSynced');
       }); // end of $transaction
 
       return reply.code(200).send({ success: true });
@@ -1020,7 +1020,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             if (updatedSession) {
               const io = getIO();
               io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
-              io.to(session.restaurantId).emit('adminStateSynced');
+              io.emit('adminStateSynced');
             }
           });
         }
