@@ -356,23 +356,46 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           order_id: razorpayOrderId,
           handler: async function (response: any) {
             addDebugLog('Razorpay Payment Success: ' + response.razorpay_payment_id);
-            // Automatically trigger WhatsApp receipt
-            if (newTxId && customerPhone) {
-              addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
-              try {
-                await fetch('/api/receipt', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
-                });
-              } catch (err) {
-                addDebugLog('Failed to auto-send receipt');
+            setPaymentProcessing(true);
+            try {
+              const verifyRes = await fetch(`/api/sessions/${tableSession?.sessionId}/verify-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature
+                })
+              });
+              
+              if (!verifyRes.ok) {
+                const errData = await verifyRes.json();
+                throw new Error(errData.error || 'Payment verification failed');
               }
+              
+              // Automatically trigger WhatsApp receipt
+              if (newTxId && customerPhone) {
+                addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
+                try {
+                  await fetch('/api/receipt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
+                  });
+                } catch (err) {
+                  addDebugLog('Failed to auto-send receipt');
+                }
+              }
+              
+              setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
+              setShowUpiOptions(false);
+              setCheckoutMode('SUCCESS');
+            } catch (err: any) {
+               addDebugLog('Verification error: ' + err.message);
+               alert('Payment successful but verification failed: ' + err.message);
+            } finally {
+               setPaymentProcessing(false);
             }
-            
-            setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
-            setShowUpiOptions(false);
-            setCheckoutMode('SUCCESS');
           },
           prefill: {
             name: customerName,
@@ -1088,10 +1111,30 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       name: restaurant?.name || "Table Top",
                       description: `Split Payment for ${mySplit.name}`,
                       order_id: resData.razorpayOrderId,
-                      handler: function (razorpayResponse: any) {
-                        socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
-                        setLocalClaimedSplitId(null);
-                        setPaymentProcessing(false);
+                      handler: async function (razorpayResponse: any) {
+                        try {
+                          const verifyRes = await fetch(`/api/sessions/${tableSession?.sessionId}/verify-payment`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              razorpay_order_id: razorpayResponse.razorpay_order_id,
+                              razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                              razorpay_signature: razorpayResponse.razorpay_signature
+                            })
+                          });
+                          
+                          if (!verifyRes.ok) {
+                            const errData = await verifyRes.json();
+                            throw new Error(errData.error || 'Payment verification failed');
+                          }
+                          
+                          socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
+                        } catch (err: any) {
+                          alert('Payment successful but verification failed: ' + err.message);
+                        } finally {
+                          setLocalClaimedSplitId(null);
+                          setPaymentProcessing(false);
+                        }
                       },
                       prefill: {
                         name: customerName || mySplit.name,
