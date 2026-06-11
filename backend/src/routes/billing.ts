@@ -719,83 +719,90 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
   });
 
-  // Razorpay Webhook Endpoint
-  fastify.post('/api/webhook/razorpay', async (request, reply) => {
+  
+  interface VerifyPaymentBody {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }
+
+  // Synchronous Frontend Payment Verification
+  fastify.post<{ Params: { sessionId: string }; Body: VerifyPaymentBody }>('/api/sessions/:sessionId/verify-payment', async (request, reply) => {
     try {
-      const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-      if (!secret) return reply.code(500).send({ error: 'Webhook secret not configured' });
+      const { sessionId } = request.params;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = request.body;
 
-      const signature = request.headers['x-razorpay-signature'] as string;
-      if (!signature) return reply.code(400).send({ error: 'Missing signature' });
-
-      // Verify signature using crypto HMAC-SHA256
-      const payload = JSON.stringify(request.body);
-      const expectedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-
-      if (expectedSignature !== signature) {
-        // Fastify's JSON.stringify might reorder keys. If it fails, log and reject.
-        fastify.log.warn(`Webhook signature mismatch. Expected: ${expectedSignature}, Got: ${signature}`);
-        return reply.code(400).send({ error: 'Invalid signature' });
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return reply.code(400).send({ error: 'Missing payment signature parameters' });
       }
 
-      const event = request.body as any;
+      const secret = process.env.RAZORPAY_KEY_SECRET || '0PQLgUWfsMW7lXYMOLk1O2mH';
+      
+      const generated_signature = crypto.createHmac('sha256', secret)
+        .update(razorpay_order_id + "|" + razorpay_payment_id)
+        .digest('hex');
 
-      if (event.event === 'payment.captured' || event.event === 'order.paid') {
-        const paymentData = event.payload.payment.entity;
-        const razorpayOrderId = paymentData.order_id;
+      if (generated_signature !== razorpay_signature) {
+        return reply.code(400).send({ error: 'Signature verification failed' });
+      }
 
-        // Find the transaction
-        const transaction = await prisma.transaction.findUnique({
-          where: { razorpayOrderId: razorpayOrderId },
-          include: { 
-            session: { 
-              include: { 
-                table: { include: { restaurant: true } }, 
-                orders: { include: { items: true } } 
-              } 
-            }, 
-            paymentItems: true 
+      const transaction = await prisma.transaction.findUnique({
+        where: { razorpayOrderId: razorpay_order_id },
+        include: { 
+          session: { 
+            include: { 
+              table: { include: { restaurant: true } }, 
+              orders: { include: { items: { include: { menuItem: true } } } } 
+            } 
+          }, 
+          paymentItems: true 
+        }
+      });
+
+      if (!transaction) return reply.code(404).send({ error: 'Transaction not found' });
+      
+      if (transaction.status === 'COMPLETED') {
+        return reply.code(200).send({ success: true, message: 'Already verified' });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: 'COMPLETED',
+            razorpayPaymentId: razorpay_payment_id,
+            razorpaySignature: razorpay_signature
           }
         });
 
-        if (transaction && transaction.status === 'PENDING') {
-          await prisma.$transaction(async (tx) => {
-            await tx.transaction.update({
-              where: { id: transaction.id },
-              data: {
-                status: 'COMPLETED',
-                razorpayPaymentId: paymentData.id,
-                razorpaySignature: signature
-              }
-            });
+        // Update session status if fully paid
+        const session = transaction.session;
+        const allCompletedTxs = await tx.transaction.findMany({
+          where: { sessionId: session.id, status: 'COMPLETED' },
+          include: { paymentItems: true }
+        });
 
-            // Update session status if fully paid
-            const session = transaction.session;
-            const allCompletedTxs = await tx.transaction.findMany({
-              where: { sessionId: session.id, status: 'COMPLETED' },
-              include: { paymentItems: true }
-            });
+        const updatedPaidQuantityMap = new Map<string, Decimal>();
+        allCompletedTxs.forEach(ctx => {
+          ctx.paymentItems.forEach(pi => {
+            const currentPaid = updatedPaidQuantityMap.get(pi.orderItemId) || new Decimal(0);
+            updatedPaidQuantityMap.set(pi.orderItemId, currentPaid.add(new Decimal(pi.quantityPaid.toString())));
+          });
+        });
 
-            const updatedPaidQuantityMap = new Map<string, Decimal>();
-            allCompletedTxs.forEach(ctx => {
-              ctx.paymentItems.forEach(pi => {
-                const currentPaid = updatedPaidQuantityMap.get(pi.orderItemId) || new Decimal(0);
-                updatedPaidQuantityMap.set(pi.orderItemId, currentPaid.add(new Decimal(pi.quantityPaid.toString())));
-              });
-            });
+        let isFullyPaid = true;
+        session.orders.forEach(order => {
+          if (order.status === 'PENDING') return;
+          order.items.forEach(item => {
+            const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
+            const qtyOrdered = new Decimal(item.quantity.toString());
+            if (qtyPaid.lt(qtyOrdered)) {
+              isFullyPaid = false;
+            }
+          });
+        });
 
-            let isFullyPaid = true;
-            session.orders.forEach(order => {
-              if (order.status === 'PENDING') return;
-              order.items.forEach(item => {
-                const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
-                const qtyOrdered = new Decimal(item.quantity.toString());
-                if (qtyPaid.lt(qtyOrdered)) {
-                  isFullyPaid = false;
-                }
-              });
-            });
-
+        
             if (isFullyPaid && session.table.restaurant.paymentMode === 'POST_PAY') {
               await tx.session.update({
                 where: { id: session.id },
@@ -817,8 +824,50 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                 status: 'COMPLETED'
               });
             }
+            
+            // Transition PAYMENT_PENDING orders to NEW
+            const paidOrderItemIds = new Set(transaction.paymentItems.map(pi => pi.orderItemId));
+            const affectedOrders = session.orders.filter(o => 
+              o.status === 'PAYMENT_PENDING' && o.items.some(i => paidOrderItemIds.has(i.id))
+            );
+
+            for (const order of affectedOrders) {
+              await tx.order.update({
+                where: { id: order.id },
+                data: { status: 'NEW' }
+              });
+
+              const io = getIO();
+              io.to(session.restaurantId).emit('orderCreated', {
+                order: {
+                  orderId: order.id,
+                  status: 'NEW',
+                  tableNumber: session.table.number,
+                  restaurantId: session.restaurantId,
+                  paymentMethod: 'ONLINE',
+                  items: order.items.map(i => ({
+                    name: i.menuItem.name,
+                    quantity: new Decimal(i.quantity.toString()).toNumber(),
+                    modifications: i.modifications
+                  })),
+                  createdAt: order.createdAt,
+                  totalAmount: transaction.amount.toString()
+                }
+              });
+            }
+            
+            const updatedSession = await tx.session.findUnique({
+              where: { id: session.id },
+              include: {
+                table: { include: { restaurant: true } },
+                orders: { include: { items: { include: { menuItem: true } } } },
+                transactions: { where: { status: 'COMPLETED' }, include: { paymentItems: true } }
+              }
+            });
+            const io = getIO();
+            io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
           });
-        }
+
       }
 
       return reply.code(200).send({ status: 'ok' });
