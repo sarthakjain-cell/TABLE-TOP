@@ -377,7 +377,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               if (newTxId && customerPhone) {
                 addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
                 try {
-                  await fetch('/api/receipt', {
+                  await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/receipt`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
