@@ -720,7 +720,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   });
 
 
-  fastify.post<{ Params: { sessionId: string }; Body: VerifyPaymentBody }>('/api/sessions/:sessionId/verify-payment', async (request, reply) => {
+  fastify.post<{ Params: { sessionId: string }; Body: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; } }>('/api/sessions/:sessionId/verify-payment', async (request, reply) => {
     try {
       const { sessionId } = request.params;
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = request.body;
@@ -869,6 +869,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         });
         const io = getIO();
         io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
+        io.to(session.restaurantId).emit('adminStateSynced');
       }); // end of $transaction
 
       return reply.code(200).send({ success: true });
@@ -1019,6 +1020,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             if (updatedSession) {
               const io = getIO();
               io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
+              io.to(session.restaurantId).emit('adminStateSynced');
             }
           });
         }

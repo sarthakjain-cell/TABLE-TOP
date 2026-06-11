@@ -317,8 +317,19 @@ export default function AdminPage() {
   useEffect(() => {
     if (!socket || !isConnected) return;
     const handleAdminSync = (data: any) => {
-      // Mock logic to refresh on socket events
-      // In reality, this would dispatch to update individual table states
+      let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
+      if (storedRestId) {
+        const headers = { 'Authorization': `Bearer ${authToken}` };
+        fetch(`/api/restaurants/${storedRestId}/tables`, { headers }).then(res => res.json()).then(data => {
+          if(Array.isArray(data)) {
+            const mapped = data.map((t: any) => ({ ...t, activeSession: t.sessions && t.sessions.length > 0 ? t.sessions[0] : undefined }));
+            setTables(mapped.sort((a: any, b: any) => Number(a.number) - Number(b.number)));
+          }
+        });
+        fetch(`/api/restaurants/${storedRestId}/transactions`, { headers }).then(res => res.json()).then(data => {
+          if(Array.isArray(data)) setTransactions(data);
+        });
+      }
     };
     
     const handleHelpRequested = ({ tableNumber, requestType }: { tableNumber: string, requestType: string }) => {
@@ -921,9 +932,11 @@ export default function AdminPage() {
                     realTotal = subtotal;
                     
                     table.activeSession.orders?.forEach((order: any) => {
-                       if (order.status !== 'COMPLETED') {
+                       if (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') {
                          order.items?.forEach((item: any) => {
-                           realItems.push(`${item.orderedQuantity}x ${item.name}`);
+                           const qty = item.quantity || item.orderedQuantity;
+                           const name = item.menuItem?.name || item.name || 'Item';
+                           realItems.push(`${qty}x ${name}`);
                          });
                        }
                     });

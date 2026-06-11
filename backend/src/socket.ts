@@ -28,6 +28,9 @@ export interface ServerToClientEvents {
   establishmentSettingsChanged: (data: any) => void;
   newOrderReceived: (data: { order: any }) => void;
   newOrderSubmitted: (data: { order: any }) => void;
+  orderCreated: (data: { order: any }) => void;
+  sessionUpdated: (data: any) => void;
+  adminStateSynced: () => void;
   splitPaymentSync: (data: { lobby: any | null }) => void;
 }
 
