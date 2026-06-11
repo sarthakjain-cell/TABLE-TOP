@@ -386,7 +386,9 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     const errTxt = await receiptRes.text();
                     alert('Backend receipt error: ' + errTxt);
                   } else {
-                    addDebugLog('Receipt API returned OK!');
+                    const resJson = await receiptRes.json();
+                    alert('Backend Response: ' + resJson.message);
+                    addDebugLog('Receipt API returned OK: ' + resJson.message);
                   }
                 } catch (err: any) {
                   alert('Network error while sending receipt: ' + err.message);
