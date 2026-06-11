@@ -904,14 +904,13 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         const paymentData = event.payload.payment.entity;
         const razorpayOrderId = paymentData.order_id;
 
-        // Find the transaction
         const transaction = await prisma.transaction.findUnique({
           where: { razorpayOrderId: razorpayOrderId },
           include: { 
             session: { 
               include: { 
                 table: { include: { restaurant: true } }, 
-                orders: { include: { items: true } } 
+                orders: { include: { items: { include: { menuItem: true } } } } 
               } 
             }, 
             paymentItems: true 
