@@ -37,10 +37,18 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       // Calculate aggregate metrics
       let totalRevenue = new Decimal(0);
       let totalDeliveryFees = new Decimal(0);
+      let totalCash = new Decimal(0);
+      let totalOnline = new Decimal(0);
 
       const flatTransactions = transactions.map(tx => {
         totalRevenue = totalRevenue.add(new Decimal(tx.amount.toString()));
         totalDeliveryFees = totalDeliveryFees.add(new Decimal(tx.deliveryFeeApplied.toString()));
+
+        if (tx.paymentMethod === 'CASH') {
+          totalCash = totalCash.add(new Decimal(tx.amount.toString()));
+        } else if (tx.paymentMethod === 'ONLINE' || tx.paymentMethod === 'UPI') {
+          totalOnline = totalOnline.add(new Decimal(tx.amount.toString()));
+        }
 
         return {
           id: tx.id,
@@ -49,6 +57,7 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           deliveryFeeApplied: tx.deliveryFeeApplied,
           customerName: tx.customerName,
           customerPhone: tx.customerPhone,
+          paymentMethod: tx.paymentMethod || 'UNKNOWN',
           roomOrTable: tx.session.table.number,
           createdAt: tx.createdAt,
           status: tx.status
@@ -66,8 +75,10 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.code(200).send({
         metrics: {
           totalRevenue: totalRevenue.toFixed(2),
-          totalOrders,
-          totalDeliveryFees: totalDeliveryFees.toFixed(2)
+          totalDeliveryFees: totalDeliveryFees.toFixed(2),
+          totalCash: totalCash.toFixed(2),
+          totalOnline: totalOnline.toFixed(2),
+          totalOrders
         },
         transactions: flatTransactions
       });

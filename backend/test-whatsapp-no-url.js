@@ -14,7 +14,7 @@ async function test() {
       to: phone,
       type: 'template',
       template: {
-        name: 'ontable_receipt',
+        name: 'digital_receipt',
         language: { code: 'en' },
         components: [
           {
@@ -22,7 +22,7 @@ async function test() {
             parameters: [
               { type: 'text', text: "Table Top" },
               { type: 'text', text: "150.00" },
-              { type: 'text', text: "https://tabletop.com/receipt/123" }
+              { type: 'text', text: "Check your email" }
             ]
           }
         ]

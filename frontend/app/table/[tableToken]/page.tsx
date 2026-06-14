@@ -529,7 +529,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   <button 
                     key={c}
                     onClick={() => setActiveCategory(c)}
-                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
+                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ₹{
                       activeCategory === c 
                         ? 'bg-gray-900 text-white' 
                         : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -551,7 +551,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   className="border-b border-gray-100 py-6 last:border-none flex justify-between items-start gap-4"
                 >
                   {/* Left Column */}
-                  <div className={`flex flex-col ${item.imageUrl ? 'w-[65%]' : 'w-full'}`}>
+                  <div className={`flex flex-col ₹{item.imageUrl ? 'w-[65%]' : 'w-full'}`}>
                     {/* Mock Veg Tag */}
                     <div className="w-3.5 h-3.5 border-2 border-green-600 flex items-center justify-center rounded-sm mb-1.5 opacity-80">
                       <div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div>
@@ -561,9 +561,9 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       {item.name}
                     </h3>
                     <div className="text-sm font-semibold text-gray-600 mt-0.5">
-                      ${decimalMath.formatCurrency(item.price)}
+                      ₹{decimalMath.formatCurrency(item.price)}
                       {item.hasHalfPortion && item.halfPrice && (
-                        <span className="ml-2 text-xs text-blue-600">Half: ${decimalMath.formatCurrency(item.halfPrice)}</span>
+                        <span className="ml-2 text-xs text-blue-600">Half: ₹{decimalMath.formatCurrency(item.halfPrice)}</span>
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5 line-clamp-2 leading-relaxed pr-2">
@@ -610,7 +610,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         <img 
                           src={`${item.imageUrl}?v=${imageCacheBuster.current}`}
                           alt={item.name} 
-                          className={`w-full h-full object-cover ${!item.isAvailable ? 'grayscale opacity-60' : ''}`}
+                          className={`w-full h-full object-cover ₹{!item.isAvailable ? 'grayscale opacity-60' : ''}`}
                           loading="lazy"
                         />
                       </div>
@@ -687,7 +687,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-extrabold text-gray-800">${item.subtotal}</span>
+                        <span className="text-sm font-extrabold text-gray-800">₹{item.subtotal}</span>
                         <div className="flex items-center border rounded-lg overflow-hidden">
                           <button
                             onClick={() => handleOptimisticAdd(item.menuItemId, -1, item.modifications)}
@@ -710,7 +710,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   ))}
                   <div className="flex justify-between items-center pt-2 font-bold text-gray-800">
                     <span>Subtotal:</span>
-                    <span>${tableSession.cart.subtotal}</span>
+                    <span>₹{tableSession.cart.subtotal}</span>
                   </div>
                 </div>
 
@@ -779,7 +779,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         <span className="text-xs font-bold text-gray-400">
                           {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </span>
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${statusColor}`}>
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ₹{statusColor}`}>
                           {statusText}
                         </span>
                       </div>
@@ -792,7 +792,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                 <p className="text-xs text-amber-500 font-bold">({item.modifications.join(', ')})</p>
                               )}
                             </div>
-                            <span className="text-sm font-extrabold text-indigo-600">${item.price}</span>
+                            <span className="text-sm font-extrabold text-indigo-600">₹{item.price}</span>
                           </div>
                         ))}
                       </div>
@@ -929,18 +929,18 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 {/* Tracker Header */}
                 <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 shadow-sm text-center relative overflow-hidden">
                   <p className="text-indigo-800 font-bold mb-1 uppercase tracking-widest text-xs">Total Bill</p>
-                  <p className="text-5xl font-black text-indigo-600 tabular-nums tracking-tighter">${grandTotal.toFixed(2)}</p>
+                  <p className="text-5xl font-black text-indigo-600 tabular-nums tracking-tighter">₹{grandTotal.toFixed(2)}</p>
                   
                   <div className="mt-4 p-3 bg-white/60 rounded-xl">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remaining to Allocate</p>
-                    <p className={`text-2xl font-black tabular-nums transition-colors ${
-                      remaining === 0 ? 'text-emerald-500' : 
-                      remaining < 0 ? 'text-red-500' : 'text-gray-800'
+                    <p className={`text-2xl font-black tabular-nums transition-colors ₹{
+                      Math.abs(remaining) <= 0.01 ? 'text-emerald-500' : 
+                      remaining < -0.01 ? 'text-red-500' : 'text-gray-800'
                     }`}>
-                      ${Math.abs(remaining).toFixed(2)}
+                      ₹{Math.abs(remaining).toFixed(2)}
                     </p>
-                    {remaining === 0 && <p className="text-emerald-600 text-sm font-bold mt-1">✨ Bill fully allocated!</p>}
-                    {remaining < 0 && <p className="text-red-600 text-sm font-bold mt-1">⚠️ Exceeds total by ${Math.abs(remaining).toFixed(2)}</p>}
+                    {Math.abs(remaining) <= 0.01 && <p className="text-emerald-600 text-sm font-bold mt-1">✨ Bill fully allocated!</p>}
+                    {remaining < -0.01 && <p className="text-red-600 text-sm font-bold mt-1">⚠️ Exceeds total by ₹{Math.abs(remaining).toFixed(2)}</p>}
                   </div>
                 </div>
 
@@ -989,7 +989,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   ))}
                   
                   <button
-                    onClick={() => setContributors([...contributors, { id: Date.now(), name: `Payer ${contributors.length + 1}`, amount: "" }])}
+                    onClick={() => setContributors([...contributors, { id: Date.now(), name: `Payer ₹{contributors.length + 1}`, amount: "" }])}
                     className="w-full py-3 border-2 border-dashed border-gray-300 rounded-2xl text-gray-500 font-bold text-sm hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                   >
                     + Add Person
@@ -1001,7 +1001,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       const validSplits = contributors.filter(c => parseFloat(c.amount) > 0);
                       socket?.emit('initiateSplitPayment', { splits: validSplits.map(c => ({ ...c, amount: parseFloat(c.amount) })) });
                     }}
-                    disabled={paymentProcessing || remaining !== 0}
+                    disabled={paymentProcessing || Math.abs(remaining) > 0.01}
                     className="w-full bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-indigo-500/30 disabled:opacity-50 mt-4 text-lg tracking-tight flex items-center justify-center gap-2"
                   >
                     <Users size={24} /> Start Multiplayer Split
@@ -1020,7 +1020,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                        <span className="text-6xl">🏨</span>
                      </div>
                      <p className="text-purple-800 font-bold mb-2 uppercase tracking-widest text-xs relative z-10">Total Bill</p>
-                     <p className="text-6xl font-black text-purple-600 tabular-nums tracking-tighter relative z-10">${grandTotal.toFixed(2)}</p>
+                     <p className="text-6xl font-black text-purple-600 tabular-nums tracking-tighter relative z-10">₹{grandTotal.toFixed(2)}</p>
                   </div>
                   
                   <div className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-sm space-y-4">
@@ -1118,7 +1118,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       amount: resData.amount,
                       currency: "INR",
                       name: restaurant?.name || "Table Top",
-                      description: `Split Payment for ${mySplit.name}`,
+                      description: `Split Payment for ₹{mySplit.name}`,
                       order_id: resData.razorpayOrderId,
                       handler: async function (razorpayResponse: any) {
                         try {
@@ -1209,7 +1209,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                    <h3 className="text-2xl font-black text-gray-800 text-center mb-4">Multiplayer Split</h3>
                    <div className="space-y-3">
                      {splitLobby.splits.map(split => (
-                       <div key={split.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
+                       <div key={split.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ₹{
                          split.status === 'PAID' ? 'bg-emerald-50 border-emerald-200' :
                          split.status === 'CLAIMED' ? 'bg-amber-50 border-amber-200 opacity-50' :
                          'bg-white border-gray-200 hover:border-indigo-400'
@@ -1256,7 +1256,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   onClick={() => {
                     requestHelp(req);
                     setShowBellModal(false);
-                    alert(`Request sent: ${req}`);
+                    alert(`Request sent: ₹{req}`);
                   }}
                   className="bg-gray-50 border border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 p-4 rounded-2xl text-xs font-semibold text-gray-600 text-center transition active:scale-95 shadow-sm"
                 >
@@ -1278,7 +1278,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t p-2 flex justify-around items-center z-40 shadow-lg">
         <button
           onClick={() => setActiveTab('menu')}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
+          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ₹{
             activeTab === 'menu' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
           }`}
         >
@@ -1287,7 +1287,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         </button>
         <button
           onClick={() => setActiveTab('cart')}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl relative ${
+          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl relative ₹{
             activeTab === 'cart' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
           }`}
         >
@@ -1301,7 +1301,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         </button>
         <button
           onClick={() => setActiveTab('orders')}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
+          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ₹{
             activeTab === 'orders' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
           }`}
         >
@@ -1314,7 +1314,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               setActiveTab('billing');
               if (checkoutMode === 'IDLE') setCheckoutMode('CHOICE');
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
+            className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ₹{
               activeTab === 'billing' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
             }`}
           >

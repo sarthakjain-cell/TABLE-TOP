@@ -123,7 +123,7 @@ async function getAggregatedCart(sessionId: string) {
  * Queries database for the complete un-compromised table state.
  * Syncs cart, ordered tickets, and split billing details to reconnecting clients.
  */
-async function getTableSessionSyncData(sessionId: string) {
+export async function getTableSessionSyncData(sessionId: string) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
     include: {

@@ -39,6 +39,7 @@ export default function KitchenPage() {
   const [establishmentType, setEstablishmentType] = useState<'RESTAURANT' | 'HOTEL'>('RESTAURANT');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [inputTokenStr, setInputTokenStr] = useState<string>('');
+  const [kitchenToast, setKitchenToast] = useState<{message: string, type: 'call' | 'cash'} | null>(null);
   
   const [shiftStarted, setShiftStarted] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -194,6 +195,17 @@ export default function KitchenPage() {
       if (data.restaurantId === restaurantId) setEstablishmentType(data.establishmentType);
     };
     
+    const handleHelpRequested = ({ tableNumber, requestType }: { tableNumber: string, requestType: string }) => {
+      setKitchenToast({ 
+        message: `Table ${tableNumber} is requesting: ${requestType}`,
+        type: requestType.includes('Cash') ? 'cash' : 'call'
+      });
+      const audio = new Audio('/assets/audio/chime.mp3');
+      audio.play().catch(err => console.log('Audio blocked', err));
+      
+      setTimeout(() => setKitchenToast(null), 15000);
+    };
+
     socket.on('newOrderReceived', handleNewOrder);
     socket.on('newOrderSubmitted', handleNewOrder);
     socket.on('orderStatusUpdated', handleStatusUpdated);
@@ -201,6 +213,7 @@ export default function KitchenPage() {
     socket.on('operationalModeChanged', handleModeChange);
     socket.on('modeToggled', handleModeChange);
     socket.on('establishmentSettingsChanged', handleSettingsChange);
+    socket.on('helpRequested', handleHelpRequested);
 
     return () => {
       socket.off('newOrderReceived', handleNewOrder);
@@ -210,6 +223,7 @@ export default function KitchenPage() {
       socket.off('operationalModeChanged', handleModeChange);
       socket.off('modeToggled', handleModeChange);
       socket.off('establishmentSettingsChanged', handleSettingsChange);
+      socket.off('helpRequested', handleHelpRequested);
     };
   }, [socket, isConnected, restaurantId, authToken]);
 
@@ -344,10 +358,25 @@ export default function KitchenPage() {
         </div>
       </header>
 
-      {/* Main Two-Column Layout */}
-      <main className="flex-1 flex overflow-hidden relative z-10">
-        
-        {/* Left: Main Ticket Rail (75%) */}
+      {/* Main KDS View */}
+      <main className="flex-1 flex overflow-hidden relative">
+
+        {/* Global Toast Notification */}
+        {kitchenToast && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-bounce">
+            <div className={`flex items-center gap-4 px-8 py-4 rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] border-2 backdrop-blur-md ${
+              kitchenToast.type === 'cash' 
+                ? 'bg-emerald-900/90 border-emerald-400 text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.4)]' 
+                : 'bg-amber-900/90 border-amber-400 text-amber-100 shadow-[0_0_30px_rgba(251,191,36,0.4)]'
+            }`}>
+              <Bell className="animate-pulse" size={32} />
+              <span className="text-xl font-black tracking-widest">{kitchenToast.message}</span>
+              <button onClick={() => setKitchenToast(null)} className="ml-4 hover:opacity-70 p-2"><X size={24} /></button>
+            </div>
+          </div>
+        )}
+
+        {/* Left: Active Tickets Board (75%) */}
         <section className="w-3/4 p-6 overflow-y-auto custom-scrollbar relative">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.8)_2px,transparent_2px),linear-gradient(90deg,rgba(15,23,42,0.8)_2px,transparent_2px)] bg-[size:40px_40px] [mask-image:linear-gradient(to_bottom,white,transparent)] opacity-20 pointer-events-none"></div>
           {tickets.length === 0 ? (

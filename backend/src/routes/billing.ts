@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '../prisma';
 import { Decimal } from 'decimal.js';
-import { getIO } from '../socket';
+import { getIO, getTableSessionSyncData } from '../socket';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
@@ -290,6 +290,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           amount: totalGrand,
           taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
           status: 'PENDING',
+          paymentMethod: 'ONLINE',
           razorpayOrderId: razorpayOrder.id,
           customerName,
           customerPhone,
@@ -431,6 +432,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           amount: new Decimal(amountToPay.toString()),
           taxPaid: totalTaxAllocated.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
           status: 'PENDING',
+          paymentMethod: 'ONLINE',
           razorpayOrderId: razorpayOrder.id,
           customerName,
           customerPhone,
@@ -677,6 +679,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             amount: totalGrand,
             taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
             status: 'PENDING',
+            paymentMethod: paymentMethod,
             customerName,
             customerPhone,
             deliveryFeeApplied: roomServiceFee,
@@ -694,6 +697,10 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
       io.to(sessionRoom).emit('cartUpdated', { sessionId, cart: { items: [], subtotal: '0.00' } });
       io.to(sessionRoom).emit('orderStatusUpdated', { orderId: result.updatedOrder.id, status: 'PAYMENT_PENDING', paymentMethod: paymentMethod });
+
+      if (paymentMethod === 'CASH') {
+        io.emit('helpRequested', { tableNumber: session.table.number, requestType: 'Cash Payment' });
+      }
 
       io.emit('newOrderReceived', {
         order: {
@@ -757,16 +764,9 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       
       if (transaction.status === 'COMPLETED') {
         // Even if verified, push the updated session to the frontend so it clears the cart and moves on!
-        const updatedSession = await prisma.session.findUnique({
-          where: { id: transaction.sessionId },
-          include: {
-            table: { include: { restaurant: true } },
-            orders: { include: { items: { include: { menuItem: true } } } },
-            transactions: { where: { status: 'COMPLETED' }, include: { paymentItems: true } }
-          }
-        });
-        if (updatedSession) {
-          getIO().to(`session:${transaction.sessionId}`).emit('sessionUpdated', updatedSession);
+        const syncData = await getTableSessionSyncData(transaction.sessionId);
+        if (syncData) {
+          getIO().to(`session:${transaction.sessionId}`).emit('sessionSynced', syncData);
         }
         return reply.code(200).send({ success: true, message: 'Already verified' });
       }
@@ -859,16 +859,11 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           });
         }
         
-        const updatedSession = await tx.session.findUnique({
-          where: { id: session.id },
-          include: {
-            table: { include: { restaurant: true } },
-            orders: { include: { items: { include: { menuItem: true } } } },
-            transactions: { where: { status: 'COMPLETED' }, include: { paymentItems: true } }
-          }
-        });
+        const syncData = await getTableSessionSyncData(session.id);
         const io = getIO();
-        io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
+        if (syncData) {
+          io.to(`session:${session.id}`).emit('sessionSynced', syncData);
+        }
         io.emit('adminStateSynced');
       }); // end of $transaction
 
@@ -1019,7 +1014,10 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             });
             if (updatedSession) {
               const io = getIO();
-              io.to(`session:${session.id}`).emit('sessionUpdated', updatedSession);
+              const syncData = await getTableSessionSyncData(session.id);
+              if (syncData) {
+                io.to(`session:${session.id}`).emit('sessionSynced', syncData);
+              }
               io.emit('adminStateSynced');
             }
           });

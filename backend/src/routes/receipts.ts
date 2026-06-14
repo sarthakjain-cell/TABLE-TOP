@@ -69,8 +69,8 @@ export const receiptRoutes = async (fastify: FastifyInstance) => {
           to: formattedPhone,
           type: 'template',
           template: {
-            // NOTE: You MUST create an approved template named 'digital_receipt' in your Meta Dashboard
-            name: 'digital_receipt',
+            // NOTE: You MUST create an approved template named 'ontable_receipt' in your Meta Dashboard
+            name: 'ontable_receipt',
             language: { code: 'en' },
             components: [
               {

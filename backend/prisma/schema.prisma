@@ -149,6 +149,7 @@ model Transaction {
   amount        Decimal            @db.Decimal(10, 2)
   taxPaid       Decimal            @db.Decimal(10, 2)
   status        TransactionStatus  @default(PENDING)
+  paymentMethod String?
   customerName       String?            // Metadata tracking for split billing
   customerPhone      String?            // Metadata tracking for split billing
   deliveryFeeApplied Decimal            @db.Decimal(10, 2) @default(0.00)
