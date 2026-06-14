@@ -441,11 +441,24 @@ export default function KitchenPage() {
                              </div>
                              {item.modifications && item.modifications.length > 0 && (
                                <div className="mt-2 space-y-1">
-                                 {item.modifications.map((mod, mIdx) => (
-                                   <div key={mIdx} className="text-amber-400 font-bold text-sm tracking-wide flex items-center gap-2">
-                                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" /> {mod}
-                                   </div>
-                                 ))}
+                                 {item.modifications.map((mod, mIdx) => {
+                                   const lowerMod = mod.toLowerCase();
+                                   const isCritical = lowerMod.includes('jain') || lowerMod.includes('onion') || lowerMod.includes('garlic') || lowerMod.includes('allerg') || lowerMod.includes('vegan');
+                                   
+                                   if (isCritical) {
+                                     return (
+                                       <div key={mIdx} className="bg-rose-500/20 border-2 border-rose-500 text-rose-400 font-black text-sm tracking-widest uppercase flex items-center gap-2 p-2 mt-1 rounded-lg shadow-[0_0_15px_rgba(244,63,94,0.3)] w-fit">
+                                         <span className="animate-pulse">⚠️</span> {mod}
+                                       </div>
+                                     );
+                                   }
+
+                                   return (
+                                     <div key={mIdx} className="text-amber-400 font-bold text-sm tracking-wide flex items-center gap-2">
+                                       <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" /> {mod}
+                                     </div>
+                                   );
+                                 })}
                                </div>
                              )}
                            </div>

@@ -48,6 +48,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   
   // Optimistic UI state for cart quantities
+  const [itemBeingCustomized, setItemBeingCustomized] = useState<MenuItem | null>(null);
+  const [customMods, setCustomMods] = useState<string[]>([]);
+  const [customText, setCustomText] = useState('');
+  const [isHalfPortionMod, setIsHalfPortionMod] = useState(false);
+
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
   
   // Clear optimistic state when real server state updates
@@ -1242,6 +1247,64 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             </div>
           </div>
         )}
+
+      {/* Customization Modal */}
+      {itemBeingCustomized && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center z-[100] animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-t-3xl shadow-2xl p-6 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">Customize {itemBeingCustomized.name} {isHalfPortionMod && '(Half)'}</h3>
+              <button onClick={() => setItemBeingCustomized(null)} className="text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto custom-scrollbar pr-2 mb-4">
+              <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">Dietary & Preferences</p>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {['Jain (No Onion/Garlic)', 'No Onion', 'No Garlic', 'Extra Spicy', 'Less Spicy', 'Make it Vegan', 'Allergy Alert'].map(preset => {
+                  const isSelected = customMods.includes(preset);
+                  return (
+                    <button
+                      key={preset}
+                      onClick={() => {
+                        setCustomMods(prev => isSelected ? prev.filter(m => m !== preset) : [...prev, preset]);
+                      }}
+                      className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                    >
+                      {preset}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">Special Instructions</p>
+              <textarea 
+                value={customText}
+                onChange={(e) => setCustomText(e.target.value)}
+                placeholder="E.g. No ice, severe peanut allergy..."
+                className="w-full border-2 border-gray-200 rounded-xl p-4 text-sm font-medium focus:outline-none focus:border-indigo-500 transition-colors resize-none h-24"
+              ></textarea>
+            </div>
+
+            <div className="mt-auto pt-4 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  let finalMods = [...customMods];
+                  if (customText.trim()) finalMods.push(customText.trim());
+                  if (isHalfPortionMod) finalMods.push('Half Portion');
+                  handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods);
+                  setItemBeingCustomized(null);
+                }}
+                className="w-full bg-indigo-600 text-white font-black text-lg py-4 rounded-2xl shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-transform"
+              >
+                Add to Cart ₹{isHalfPortionMod ? itemBeingCustomized.halfPrice : itemBeingCustomized.price}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+  
       </main>
 
       {/* 4. Digital Call Bell Grid Modal */}
