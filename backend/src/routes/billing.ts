@@ -482,7 +482,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
 
       const isHotel = session.table.restaurant.establishmentType === 'HOTEL';
-      const roomServiceFee = isHotel ? new Decimal(session.table.restaurant.roomServiceFee.toString()) : new Decimal(0);
+      const roomServiceFee = new Decimal(0); // Only applied on POST_PAY full checkout to avoid duplicate charges
       const taxRate = new Decimal(session.table.restaurant.taxRate.toString());
 
       const result = await prisma.$transaction(async (tx) => {

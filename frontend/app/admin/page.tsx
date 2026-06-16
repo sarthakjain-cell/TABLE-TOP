@@ -739,13 +739,14 @@ export default function AdminPage() {
 
   const getTableTotal = (table: Table) => {
     if (!table.activeSession || !table.activeSession.orders) return "0.00";
-    let total = 0;
+    let subtotal = '0.00';
     table.activeSession.orders.forEach(o => {
       o.items.forEach(i => {
-        total += Number(i.price) * i.orderedQuantity;
+        subtotal = decimalMath.add(subtotal, decimalMath.multiply(i.price.toString(), (i.orderedQuantity || i.quantity || 1).toString()));
       });
     });
-    return total.toFixed(2);
+    const tax = decimalMath.calculateTax(subtotal, taxRate || 0);
+    return decimalMath.add(subtotal, tax);
   };
 
   const getActiveItems = (table: Table) => {
@@ -991,12 +992,13 @@ export default function AdminPage() {
                       }
                       if (order.status !== 'COMPLETED') {
                         order.items?.forEach((item: any) => {
-                          const itemTotal = decimalMath.multiply(item.price, item.quantity);
+                          const itemTotal = decimalMath.multiply(item.price.toString(), item.quantity.toString());
                           subtotal = decimalMath.add(subtotal, itemTotal);
                         });
                       }
                     });
-                    realTotal = subtotal;
+                    const taxAmt = decimalMath.calculateTax(subtotal, taxRate || 0);
+                    realTotal = decimalMath.add(subtotal, taxAmt);
                     
                     table.activeSession.orders?.forEach((order: any) => {
                        if (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') {
@@ -1442,6 +1444,7 @@ export default function AdminPage() {
                         <th className="px-6 py-4">Amount</th>
                         <th className="px-6 py-4">Customer</th>
                         <th className="px-6 py-4 text-right">Date & Time</th>
+                        <th className="px-6 py-4 text-center">Receipt Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -1463,11 +1466,31 @@ export default function AdminPage() {
                             {new Date(tx.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} <br/>
                             <span className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-2 items-center">
+                              <a 
+                                href={`/receipt/${tx.id}?admin=true`} 
+                                target="_blank" 
+                                className="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 w-full text-center transition-colors border border-gray-200 shadow-sm"
+                              >
+                                View / Download Bill
+                              </a>
+                              {tx.customerPhone && (
+                                <a 
+                                  href={`https://wa.me/${tx.customerPhone.startsWith('+') ? tx.customerPhone.replace('+', '') : (tx.customerPhone.startsWith('91') ? tx.customerPhone : '91' + tx.customerPhone)}?text=${encodeURIComponent('Here is your digital bill from ' + (merchantName || 'our restaurant') + ': ' + (typeof window !== 'undefined' ? window.location.origin : '') + '/receipt/' + tx.id)}`}
+                                  target="_blank"
+                                  className="text-xs font-bold bg-[#25D366] hover:bg-[#1ebd5a] text-white py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 w-full text-center transition-colors shadow-sm"
+                                >
+                                  WhatsApp Receipt
+                                </a>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                       {filteredTransactions.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-8 text-center text-gray-500 text-sm">
+                          <td colSpan={5} className="px-6 py-8 text-center text-gray-500 text-sm">
                             No transactions found for the selected filter.
                           </td>
                         </tr>

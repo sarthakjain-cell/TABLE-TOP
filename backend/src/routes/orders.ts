@@ -50,7 +50,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const order = await prisma.order.create({
         data: {
           sessionId,
-          status: 'NEW',
+          status: session.table.restaurant.paymentMode === 'PRE_PAY' ? 'PAYMENT_PENDING' : 'NEW',
           items: {
             create: items.map(item => {
               const dbItem = menuMap.get(item.menuItemId);
@@ -80,13 +80,14 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       const io = getIO();
       // Notify customer session room that order status is set to NEW
-      io.to(`session:${sessionId}`).emit('orderStatusUpdated', { orderId: order.id, status: 'NEW' });
+      const newStatus = session.table.restaurant.paymentMode === 'PRE_PAY' ? 'PAYMENT_PENDING' : 'NEW';
+      io.to(`session:${sessionId}`).emit('orderStatusUpdated', { orderId: order.id, status: newStatus });
 
       // Notify Kitchen line displays about the new incoming ticket with full details (excluding sensitive customer PII)
       // Contains table number, items, quantities, modifications, and order timestamp
       io.emit('orderStatusUpdated', {
         orderId: order.id,
-        status: 'NEW',
+        status: newStatus,
         tableNumber: session.table.number,
         restaurantId: session.restaurantId,
         items: order.items.map(i => ({
