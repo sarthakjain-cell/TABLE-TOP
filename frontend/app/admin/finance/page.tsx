@@ -220,6 +220,7 @@ export default function FinanceDashboard() {
                     <th className="px-6 py-4 border-b border-gray-200">Method</th>
                     <th className="px-6 py-4 border-b border-gray-200">Amount</th>
                     <th className="px-6 py-4 border-b border-gray-200">Delivery Fee</th>
+                    <th className="px-6 py-4 border-b border-gray-200 text-right">Receipt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
@@ -245,11 +246,16 @@ export default function FinanceDashboard() {
                       <td className="px-6 py-4 font-black text-purple-600">
                         ${Number(tx.deliveryFeeApplied).toFixed(2)}
                       </td>
+                      <td className="px-6 py-4 text-right">
+                        <a href={`/receipt/${tx.id}`} target="_blank" rel="noopener noreferrer" className="text-xs font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors inline-block">
+                          📄 View
+                        </a>
+                      </td>
                     </tr>
                   ))}
                   {transactions.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-gray-400 font-semibold">
+                      <td colSpan={7} className="px-6 py-12 text-center text-gray-400 font-semibold">
                         No transactions found for the selected period.
                       </td>
                     </tr>

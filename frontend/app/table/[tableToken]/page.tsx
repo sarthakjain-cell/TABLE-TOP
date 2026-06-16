@@ -433,28 +433,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 throw new Error(errData.error || 'Payment verification failed');
               }
               
-              // Automatically trigger WhatsApp receipt
-              if (newTxId && customerPhone) {
-                addDebugLog('Auto-sending WhatsApp receipt to ' + customerPhone);
-                try {
-                  const receiptRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/receipt`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: customerPhone, transactionId: newTxId })
-                  });
-                  if (!receiptRes.ok) {
-                    const errTxt = await receiptRes.text();
-                    toast.error('Failed to send WhatsApp receipt');
-                  } else {
-                    const resJson = await receiptRes.json();
-                    toast.success('WhatsApp Receipt Sent!');
-                    addDebugLog('Receipt API returned OK: ' + resJson.message);
-                  }
-                } catch (err: any) {
-                  alert('Network error while sending receipt: ' + err.message);
-                  addDebugLog('Failed to auto-send receipt');
-                }
-              }
+
               
               setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
               setShowUpiOptions(false);
@@ -1214,13 +1193,20 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   <h2 className="text-3xl font-black text-gray-900 tracking-tight">Payment Successful</h2>
                   <p className="text-gray-500 font-medium leading-relaxed text-lg">Your order has been paid completely.</p>
                   
-                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mt-6 shadow-inner">
-                    <p className="text-green-800 font-extrabold flex items-center justify-center gap-2 text-lg">
-                      <span>📱</span> Receipt Sent via WhatsApp!
-                    </p>
-                    <p className="text-green-600 text-sm mt-2 font-medium">
-                      We've automatically sent your digital bill to {customerPhone}.
-                    </p>
+                  <div className="mt-6 flex flex-col gap-3">
+                    <button
+                      onClick={() => {
+                        const txId = (tableSession as any)?.transactions?.find((t: any) => t.status === 'COMPLETED')?.id;
+                        if (txId) {
+                          window.location.href = `/receipt/${txId}`;
+                        } else {
+                          alert('Transaction ID not found. Please ask waiter for bill.');
+                        }
+                      }}
+                      className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black px-6 py-4 rounded-xl transition active:scale-95 text-lg shadow-sm flex items-center justify-center gap-2"
+                    >
+                      📄 View & Download Digital Bill
+                    </button>
                   </div>
                   
                   <button

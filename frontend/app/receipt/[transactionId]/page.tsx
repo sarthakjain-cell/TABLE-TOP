@@ -8,6 +8,9 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
   const [isVerified, setIsVerified] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [whatsappSent, setWhatsappSent] = useState(false);
   const [waPhone, setWaPhone] = useState('');
   const [isSendingWa, setIsSendingWa] = useState(false);
 
@@ -40,6 +43,33 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
       setIsVerified(true);
     } else {
       alert('Incorrect phone number. Please try again.');
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!whatsappNumber) {
+      alert("Please enter your WhatsApp number");
+      return;
+    }
+    
+    setIsSendingWhatsApp(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/receipt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: whatsappNumber, transactionId: transaction.id })
+      });
+      if (!res.ok) {
+        throw new Error('Failed to send receipt via WhatsApp');
+      }
+      setWhatsappSent(true);
+      setTimeout(() => setWhatsappSent(false), 5000);
+      setWhatsappNumber('');
+    } catch (err) {
+      console.error(err);
+      alert('Network error while sending receipt');
+    } finally {
+      setIsSendingWhatsApp(false);
     }
   };
 
