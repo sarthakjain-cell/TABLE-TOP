@@ -198,25 +198,24 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   }, [localClaimedSplitId, socket]);
 
 
-  // 1. Verify token & join table room on mount
+  // 1. Verify token & join table room on mount (Parallelized for Speed)
   useEffect(() => {
     if (tableToken) {
       const fetchVerifyUrl = `/api/tables/verify?token=${tableToken}`;
-      fetch(fetchVerifyUrl)
-        .then((res) => {
+      const fetchMenuUrl = `/api/table/${tableToken}/menu`;
+
+      Promise.all([
+        fetch(fetchVerifyUrl).then((res) => {
           if (!res.ok) throw new Error('Invalid table scan token');
           return res.json();
-        })
-        .then((data) => {
-          setRestaurant(data.restaurant);
-          joinTableSession(data.tableId, data.session.id);
+        }),
+        fetch(fetchMenuUrl).then((res) => res.json())
+      ])
+        .then(([verifyData, items]) => {
+          setRestaurant(verifyData.restaurant);
+          // Only join session after verifying
+          joinTableSession(verifyData.tableId, verifyData.session.id);
           
-          // Fetch menu items securely via the new table token endpoint
-          // This endpoint was specifically built for the customer portal to only return available items
-          return fetch(`/api/table/${tableToken}/menu`);
-        })
-        .then((res) => res.json())
-        .then((items) => {
           if (Array.isArray(items)) {
             setMenuItems(items);
           } else if (items?.error) {
