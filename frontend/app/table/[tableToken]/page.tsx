@@ -94,6 +94,35 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const loaderRef = useRef<HTMLDivElement>(null);
   const imageCacheBuster = useRef(Date.now());
   const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category || 'Main Course')))];
+  
+  useEffect(() => {
+    if (activeTab !== 'menu') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const matchedCategory = categories.find(c => c.replace(/\s+/g, '-') === entry.target.id.replace('category-', ''));
+            if (matchedCategory) {
+               setActiveCategory(matchedCategory);
+               const btn = document.getElementById(`btn-category-${matchedCategory.replace(/\s+/g, '-')}`);
+               if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+          }
+        });
+      },
+      { root: null, rootMargin: '-100px 0px -60% 0px', threshold: 0 }
+    );
+
+    setTimeout(() => {
+      categories.forEach(c => {
+        if (c === 'All') return;
+        const el = document.getElementById(`category-${c.replace(/\s+/g, '-')}`);
+        if (el) observer.observe(el);
+      });
+    }, 500);
+
+    return () => observer.disconnect();
+  }, [activeTab, categories.length]);
 
   const [waitingForWaiterApproval, setWaitingForWaiterApproval] = useState(false);
   const [waitingOrderIds, setWaitingOrderIds] = useState<string[]>([]);
@@ -534,7 +563,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 {categories.map(c => (
                   <button 
                     key={c}
-                    onClick={() => setActiveCategory(c)}
+                    id={`btn-category-${c.replace(/\s+/g, '-')}`}
+                    onClick={() => {
+                      setActiveCategory(c);
+                      if (c === 'All') {
+                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                      } else {
+                        document.getElementById(`category-${c.replace(/\s+/g, '-')}`)?.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
                     className={`whitespace-nowrap px-5 py-2 rounded-full text-[13px] font-bold transition-all btn-tactile ${
                       activeCategory === c 
                         ? 'bg-brand-primary text-white shadow-md' 
@@ -547,144 +584,140 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               </div>
             </div>
 
-            <div className="flex flex-col">
-              {menuItems
-                .filter(item => activeCategory === 'All' || (item.category || 'Main Course') === activeCategory)
-                .slice(0, visibleItemCount)
-                .map((item) => (
-                <div
-                  key={item.id}
-                  className="border-b border-gray-100 py-6 last:border-none flex justify-between items-start gap-4"
-                >
-                  {/* Left Column */}
-                  <div className={`flex flex-col ${item.imageUrl ? 'w-[65%]' : 'w-full'}`}>
-                    {/* Mock Veg Tag */}
-                    <div className="w-3.5 h-3.5 border-2 border-green-600 flex items-center justify-center rounded-sm mb-1.5 opacity-80">
-                      <div className="w-1.5 h-1.5 bg-green-600 rounded-full"></div>
-                    </div>
-                    
-                    <h3 className="text-lg font-bold text-gray-800 leading-tight">
-                      {item.name}
-                    </h3>
-                    <div className="text-sm font-semibold text-gray-600 mt-0.5">
-                      ${decimalMath.formatCurrency(item.price)}
-                      {item.hasHalfPortion && item.halfPrice && (
-                        <span className="ml-2 text-xs text-blue-600">Half: ${decimalMath.formatCurrency(item.halfPrice)}</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1.5 line-clamp-2 leading-relaxed pr-2">
-                      {item.description || 'No description available.'}
-                    </p>
-                    
-                    {!item.imageUrl && (
-                      <div className="mt-4">
-                        {item.isAvailable ? (
-                          item.hasHalfPortion ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleOptimisticAdd(item.id, 1)}
-                                className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-[11px] px-3 py-2 rounded-lg uppercase transition-all active:scale-95"
-                              >
-                                ADD FULL
-                              </button>
-                              <button
-                                onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
-                                className="bg-white text-blue-600 border border-blue-600 shadow-sm font-bold text-[11px] px-3 py-2 rounded-lg uppercase transition-all active:scale-95"
-                              >
-                                ADD HALF
-                              </button>
-                              {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
-                                <button onClick={() => setItemBeingCustomized(item)} className="bg-gray-100 text-gray-600 shadow-sm font-bold text-[11px] px-2 py-2 rounded-lg transition-all active:scale-95">
-                                  ⚙️
-                                </button>
+            <div className="flex flex-col pb-20">
+              {categories.filter(c => c !== 'All').map(category => {
+                 const itemsInCategory = menuItems.filter(item => (item.category || 'Main Course') === category);
+                 if (itemsInCategory.length === 0) return null;
+                 return (
+                   <div key={category} id={`category-${category.replace(/\s+/g, '-')}`} className="scroll-mt-[130px] mb-8">
+                     <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">{category}</h2>
+                     <div className="grid grid-cols-1 gap-4">
+                       {itemsInCategory.map(item => (
+                          <div
+                            key={item.id}
+                            className="bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3"
+                          >
+                            {/* Left Column */}
+                            <div className={`flex flex-col ${item.imageUrl ? 'w-[60%]' : 'w-full'}`}>
+                              {/* Zomato style Veg Tag */}
+                              <div className="w-4 h-4 border border-green-500 flex items-center justify-center rounded-sm mb-2 opacity-90">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              </div>
+                              
+                              <h3 className="text-[17px] font-bold text-gray-900 leading-snug">
+                                {item.name}
+                              </h3>
+                              <div className="text-[15px] font-semibold text-gray-700 mt-1">
+                                $${decimalMath.formatCurrency(item.price)}
+                                {item.hasHalfPortion && item.halfPrice && (
+                                  <span className="ml-2 text-[11px] text-brand-secondary bg-brand-secondary/10 px-2 py-0.5 rounded-full">Half: $${decimalMath.formatCurrency(item.halfPrice)}</span>
+                                )}
+                              </div>
+                              <p className="text-[13px] text-gray-500 mt-2 line-clamp-2 leading-relaxed pr-2 font-medium">
+                                {item.description || 'No description available.'}
+                              </p>
+                              
+                              {!item.imageUrl && (
+                                <div className="mt-4">
+                                  {item.isAvailable ? (
+                                    item.hasHalfPortion ? (
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleOptimisticAdd(item.id, 1)}
+                                          className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile"
+                                        >
+                                          ADD FULL
+                                        </button>
+                                        <button
+                                          onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
+                                          className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile"
+                                        >
+                                          ADD HALF
+                                        </button>
+                                        {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
+                                          <button onClick={() => setItemBeingCustomized(item)} className="text-brand-primary font-bold text-[10px] uppercase ml-1 flex flex-col items-center justify-center btn-tactile">
+                                            <span>⚙️</span><span>Modify</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-start">
+                                        <button
+                                          onClick={() => handleOptimisticAdd(item.id, 1)}
+                                          className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile"
+                                        >
+                                          ADD
+                                        </button>
+                                        {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
+                                          <button onClick={() => setItemBeingCustomized(item)} className="text-gray-400 text-[10px] mt-1 font-semibold text-center w-[75px]">
+                                            Customizable
+                                          </button>
+                                        )}
+                                      </div>
+                                    )
+                                  ) : (
+                                    <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-md">Sold Out</span>
+                                  )}
+                                </div>
                               )}
                             </div>
-                          ) : (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleOptimisticAdd(item.id, 1)}
-                                className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-xs px-6 py-2 rounded-lg uppercase transition-all active:scale-95"
-                              >
-                                ADD
-                              </button>
-                              {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
-                                <button onClick={() => setItemBeingCustomized(item)} className="bg-gray-100 text-gray-600 shadow-sm font-bold text-xs px-3 py-2 rounded-lg transition-all active:scale-95">
-                                  ⚙️
-                                </button>
-                              )}
-                            </div>
-                          )
-                        ) : (
-                          <span className="text-xs text-red-500 font-extrabold">Out of Stock</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Right Column */}
-                  {item.imageUrl && (
-                    <div className="relative w-[35%] max-w-[140px] shrink-0">
-                      <div className="aspect-square w-full rounded-2xl overflow-hidden bg-gray-50 shadow-sm border border-gray-100">
-                        <img 
-                          src={`${item.imageUrl}?v=${imageCacheBuster.current}`}
-                          alt={item.name} 
-                          className={`w-full h-full object-cover ${!item.isAvailable ? 'grayscale opacity-60' : ''}`}
-                          loading="lazy"
-                        />
-                      </div>
-                      
-                      {item.isAvailable ? (
-                        item.hasHalfPortion ? (
-                          <div className="absolute bottom-[-16px] left-1/2 transform -translate-x-1/2 flex gap-1 w-full justify-center px-1">
-                            <button
-                              onClick={() => handleOptimisticAdd(item.id, 1)}
-                              className="bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform flex-1 text-center"
-                            >
-                              FULL
-                            </button>
-                            <button
-                              onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
-                              className="bg-white text-blue-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform flex-1 text-center"
-                            >
-                              HALF
-                            </button>
-                            {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
-                              <button onClick={() => setItemBeingCustomized(item)} className="bg-white text-gray-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg active:scale-95 transition-transform">
-                                ⚙️
-                              </button>
+                            {/* Right Column (Image) */}
+                            {item.imageUrl && (
+                              <div className="relative w-[40%] max-w-[130px] shrink-0 flex flex-col items-center mt-2">
+                                <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden shadow-sm bg-gray-50">
+                                  <img 
+                                    src={`${item.imageUrl}?v=${imageCacheBuster.current}`}
+                                    alt={item.name} 
+                                    className={`w-full h-full object-cover ${!item.isAvailable ? 'grayscale opacity-60' : ''}`}
+                                    loading="lazy"
+                                  />
+                                </div>
+                                
+                                {item.isAvailable ? (
+                                  item.hasHalfPortion ? (
+                                    <div className="absolute -bottom-3 flex gap-1 justify-center w-full px-2">
+                                      <button
+                                        onClick={() => handleOptimisticAdd(item.id, 1)}
+                                        className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center"
+                                      >
+                                        FULL
+                                      </button>
+                                      <button
+                                        onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
+                                        className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center"
+                                      >
+                                        HALF
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="absolute -bottom-4 w-full flex flex-col items-center">
+                                      <button
+                                        onClick={() => handleOptimisticAdd(item.id, 1)}
+                                        className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100"
+                                      >
+                                        ADD <span className="absolute top-0.5 right-1.5 text-[10px]">+</span>
+                                      </button>
+                                      {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
+                                        <button onClick={() => setItemBeingCustomized(item)} className="text-gray-400 text-[9px] mt-1 font-semibold text-center z-10 bg-white/90 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">
+                                          Customizable
+                                        </button>
+                                      )}
+                                    </div>
+                                  )
+                                ) : (
+                                  <div className="absolute -bottom-2 bg-gray-100 text-gray-500 border border-gray-200 font-bold text-[10px] px-3 py-1.5 rounded-lg shadow-sm">
+                                    Sold Out
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 flex gap-1">
-                            <button
-                              onClick={() => handleOptimisticAdd(item.id, 1)}
-                              className="bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-xs px-4 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform"
-                            >
-                              ADD
-                            </button>
-                            {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
-                              <button onClick={() => setItemBeingCustomized(item)} className="bg-white text-gray-600 border border-gray-200 shadow-md font-extrabold text-xs px-2 py-2 rounded-lg active:scale-95 transition-transform">
-                                ⚙️
-                              </button>
-                            )}
-                          </div>
-                        )
-                      ) : (
-                        <div className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-400 border border-gray-200 shadow-sm font-bold text-[10px] px-3 py-1 rounded-lg uppercase whitespace-nowrap">
-                          Sold Out
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {/* Loader Trigger for Infinite Scroll */}
-              <div ref={loaderRef} className="h-20 w-full flex items-center justify-center">
-                {visibleItemCount < menuItems.filter(item => activeCategory === 'All' || (item.category || 'Main Course') === activeCategory).length && (
-                  <div className="animate-pulse w-8 h-8 rounded-full border-4 border-gray-200 border-t-indigo-600"></div>
-                )}
-              </div>
+                       ))}
+                     </div>
+                   </div>
+                 );
+              })}
             </div>
           </div>
         )}
@@ -1421,7 +1454,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         <div className="fixed bottom-[80px] left-0 right-0 max-w-md mx-auto px-4 z-40 animate-slide-up">
           <button 
             onClick={() => setActiveTab('cart')}
-            className="w-full bg-brand-primary text-white rounded-2xl p-4 shadow-float flex justify-between items-center btn-tactile"
+            className="w-full bg-green-600 text-white rounded-2xl p-4 shadow-float flex justify-between items-center btn-tactile"
           >
             <div className="flex flex-col items-start">
               <span className="text-sm font-extrabold uppercase tracking-wider">
