@@ -1549,7 +1549,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
       {/* 5. Sticky Bottom Action Tab Bar */}
       <nav className="fixed bottom-0 left-0 right-0 w-full glass border-t border-gray-100 pb-safe z-40 flex justify-center">
-        <div className="flex justify-around items-stretch p-2">
+        <div className="flex justify-around items-stretch p-2 w-full max-w-2xl md:gap-8">
           <button
             onClick={() => setActiveTab('menu')}
             className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all btn-tactile ${
