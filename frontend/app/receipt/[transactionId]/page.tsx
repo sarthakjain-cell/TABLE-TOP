@@ -8,6 +8,8 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
   const [isVerified, setIsVerified] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [waPhone, setWaPhone] = useState('');
+  const [isSendingWa, setIsSendingWa] = useState(false);
 
   useEffect(() => {
     fetch(`/api/transactions/${params.transactionId}`)
@@ -16,7 +18,9 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
         if (data.error) setError(data.error);
         else {
           setTransaction(data);
-          if (!data.customerPhone) {
+          if (data.customerPhone) {
+            setWaPhone(data.customerPhone);
+          } else {
             setIsVerified(true); // If no phone is attached, skip verification
           }
         }
@@ -63,6 +67,28 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
       alert('Failed to generate PDF');
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleResendWhatsApp = async () => {
+    if (!waPhone) {
+      alert('Please enter a phone number first.');
+      return;
+    }
+    setIsSendingWa(true);
+    try {
+      const res = await fetch('/api/receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: waPhone, transactionId: params.transactionId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send WhatsApp receipt');
+      alert('WhatsApp Receipt sent successfully!');
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    } finally {
+      setIsSendingWa(false);
     }
   };
 
@@ -208,10 +234,30 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
             id="download-pdf-btn"
             onClick={handleDownloadPDF}
             disabled={isDownloading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2 mb-4"
           >
             {isDownloading ? 'Generating PDF...' : '📄 Download as PDF'}
           </button>
+          
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Resend via WhatsApp</label>
+            <div className="flex gap-2">
+              <input 
+                type="tel" 
+                placeholder="Phone Number" 
+                value={waPhone} 
+                onChange={(e) => setWaPhone(e.target.value)}
+                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button 
+                onClick={handleResendWhatsApp}
+                disabled={isSendingWa || !waPhone}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSendingWa ? 'Sending...' : '💬 Send'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>
