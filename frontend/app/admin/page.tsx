@@ -212,8 +212,16 @@ export default function AdminPage() {
          const data = await res.json();
          throw new Error(data.error);
       }
-      // Optimistically clear the requested state if needed
-      setTables(prev => prev.map(t => ({ ...t, waiterRequested: false })));
+      // Optimistically update the table state so the button disappears instantly
+      setTables(prev => prev.map(t => {
+         const newT = { ...t, waiterRequested: false };
+         if (newT.activeSession && newT.activeSession.orders) {
+           newT.activeSession.orders = newT.activeSession.orders.map((o: any) => 
+              o.id === orderId ? { ...o, status: 'NEW' } : o
+           );
+         }
+         return newT;
+      }));
     } catch (err: any) {
       alert(`Failed to approve payment: ${err.message}`);
     }
@@ -346,13 +354,18 @@ export default function AdminPage() {
       setTables(prev => prev.map(t => t.id === tableNumber ? { ...t, waiterRequested: true } : t));
       const audio = new Audio('/assets/audio/chime.mp3');
       audio.play().catch(err => console.log('Audio blocked', err));
+      handleAdminSync(null);
     };
 
     socket.on('adminStateSynced', handleAdminSync);
     socket.on('helpRequested', handleHelpRequested);
+    socket.on('newOrderReceived', handleAdminSync);
+    socket.on('orderStatusUpdated', handleAdminSync);
     return () => {
       socket.off('adminStateSynced', handleAdminSync);
       socket.off('helpRequested', handleHelpRequested);
+      socket.off('newOrderReceived', handleAdminSync);
+      socket.off('orderStatusUpdated', handleAdminSync);
     };
   }, [socket, isConnected]);
 
