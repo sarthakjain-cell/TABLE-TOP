@@ -46,6 +46,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
+  allowsDietary?: boolean;
   imageUrl?: string;
 }
 
@@ -92,7 +93,6 @@ export default function AdminPage() {
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
   const [newDishAllowsDietary, setNewDishAllowsDietary] = useState(true);
-  const [newDishAllowsDietary, setNewDishAllowsDietary] = useState(true);
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -107,7 +107,6 @@ export default function AdminPage() {
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
-  const [editDishAllowsDietary, setEditDishAllowsDietary] = useState(true);
   const [editDishAllowsDietary, setEditDishAllowsDietary] = useState(true);
   const [isUpdatingDish, setIsUpdatingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
@@ -566,7 +565,6 @@ export default function AdminPage() {
         setNewDishHasHalfPortion(false);
         setNewDishHalfPrice('');
         setNewDishAllowsDietary(true);
-        fetchMenu(restaurantId);
         setNewDishCategory('');
         setNewDishImageUrl('');
         fetch(`/api/menu?restaurantId=${restaurantId}`)
@@ -652,7 +650,7 @@ export default function AdminPage() {
     setEditDishCategory(item.category || 'Main Course');
     setEditDishImageUrl(item.imageUrl || '');
     setEditDishAllowsDietary(item.allowsDietary !== false);
-    setDishToEdit(item);
+    setEditingDish(item);
   };
 
   const toggleDishAvailability = async (id: string, currentStatus: boolean) => {

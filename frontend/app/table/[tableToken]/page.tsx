@@ -21,6 +21,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
+  allowsDietary?: boolean;
   imageUrl?: string;
 }
 
