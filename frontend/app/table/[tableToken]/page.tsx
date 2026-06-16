@@ -353,6 +353,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         addDebugLog('Payload Items Length: ' + payloadItems.length);
         if (payloadItems.length === 0) {
           addDebugLog('payloadItems is EMPTY! Session orders: ' + JSON.stringify(tableSession?.orders));
+          alert("Order is synchronizing with the kitchen. Please wait 2 seconds and click Pay again.");
           setPaymentProcessing(false);
           return;
         }
@@ -362,8 +363,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            customerName,
-            customerPhone,
+            customerName: customerName || 'Guest',
+            customerPhone: customerPhone || '9999999999',
             paymentMethod,
             items: payloadItems
           })
@@ -851,16 +852,21 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       onClick={async () => {
                         setPaymentProcessing(true);
                         const res = await submitCart();
-                        setPaymentProcessing(false);
                         if (res?.success) {
                           if (tableSession.paymentMode === 'PRE_PAY') {
-                            setSelectedModifiers([]);
-                            setCheckoutMode('PAY_FULL');
-                            setActiveTab('billing');
+                            // Wait for WebSocket to sync the new order into tableSession
+                            setTimeout(() => {
+                              setSelectedModifiers([]);
+                              setCheckoutMode('PAY_FULL');
+                              setActiveTab('billing');
+                              setPaymentProcessing(false);
+                            }, 1500);
                           } else {
                             setActiveTab('orders');
+                            setPaymentProcessing(false);
                           }
                         } else {
+                          setPaymentProcessing(false);
                           alert(res?.error || 'Failed to place order');
                         }
                       }}
@@ -1008,14 +1014,14 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     <>
                       <button
                         onClick={() => executeCheckout('UPI')}
-                        disabled={!customerName || paymentProcessing}
+                        disabled={paymentProcessing}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-transform text-white font-black py-5 rounded-xl shadow-lg shadow-indigo-600/30 disabled:opacity-50 mt-2 text-lg tracking-tight flex items-center justify-center gap-2"
                       >
                         💸 {paymentProcessing ? 'Processing...' : 'Pay via UPI / Cards'}
                       </button>
                       <button
                         onClick={() => executeCheckout('CASH')}
-                        disabled={!customerName || paymentProcessing}
+                        disabled={paymentProcessing}
                         className="w-full bg-white text-gray-700 border-2 border-gray-200 font-black py-5 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition-transform disabled:opacity-50 text-lg tracking-tight flex items-center justify-center gap-2"
                       >
                         💵 Pay Cash / Card to Waiter
