@@ -15,6 +15,7 @@ interface CreateMenuItemBody {
   category?: string;
   imageUrl?: string;
   modifierGroups?: any;
+  isVeg?: boolean;
 }
 
 interface UpdateMenuItemBody {
@@ -26,6 +27,7 @@ interface UpdateMenuItemBody {
   category?: string;
   imageUrl?: string;
   modifierGroups?: any;
+  isVeg?: boolean;
 }
 
 interface ToggleAvailabilityBody {
@@ -57,11 +59,12 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           category: { type: 'string', maxLength: 100, nullable: true },
           imageUrl: imageUrlSchema,
           modifierGroups: { type: 'array', nullable: true },
+          isVeg: { type: 'boolean', nullable: true },
         },
       },
     },
   }, async (request, reply) => {
-    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, modifierGroups } = request.body as any;
+    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, modifierGroups, isVeg } = request.body as any;
     const restaurantId = request.user!.restaurantId;
 
     try {
@@ -76,6 +79,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           category: category || "Main Course",
           imageUrl,
           modifierGroups: modifierGroups || null,
+          isVeg: isVeg !== undefined ? isVeg : true,
         },
       });
       const io = getIO();
@@ -154,12 +158,13 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           category: { type: 'string', maxLength: 100, nullable: true },
           imageUrl: imageUrlSchema,
           modifierGroups: { type: 'array', nullable: true },
+          isVeg: { type: 'boolean', nullable: true },
         },
       },
     },
   }, async (request, reply) => {
     const { id } = request.params;
-    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, modifierGroups } = request.body as any;
+    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, modifierGroups, isVeg } = request.body as any;
     const restaurantId = request.user!.restaurantId;
 
     try {
@@ -182,6 +187,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           category,
           imageUrl: imageUrl !== undefined ? imageUrl : undefined,
           modifierGroups: modifierGroups !== undefined ? modifierGroups : undefined,
+          isVeg: isVeg !== undefined ? isVeg : undefined,
         },
       });
       const io = getIO();

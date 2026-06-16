@@ -21,6 +21,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
+  isVeg?: boolean;
   modifierGroups?: any;
   imageUrl?: string;
 }
@@ -90,15 +91,20 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [receiptPhone, setReceiptPhone] = useState('');
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [isVegOnly, setIsVegOnly] = useState(false);
   const [visibleItemCount, setVisibleItemCount] = useState(10);
   const loaderRef = useRef<HTMLDivElement>(null);
   const imageCacheBuster = useRef(Date.now());
   const categories = ['All', ...Array.from(new Set(menuItems.map(m => m.category || 'Main Course')))];
   
+  const isScrollingRef = useRef(false);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (activeTab !== 'menu') return;
     const observer = new IntersectionObserver(
       (entries) => {
+        if (isScrollingRef.current) return;
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             const matchedCategory = categories.find(c => c.replace(/\s+/g, '-') === entry.target.id.replace('category-', ''));
@@ -566,6 +572,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     id={`btn-category-${c.replace(/\s+/g, '-')}`}
                     onClick={() => {
                       setActiveCategory(c);
+                      isScrollingRef.current = true;
+                      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+                      scrollTimeout.current = setTimeout(() => { isScrollingRef.current = false; }, 800);
+                      
                       if (c === 'All') {
                         document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
                       } else {
@@ -582,27 +592,50 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </button>
                 ))}
               </div>
+              <div className="flex items-center justify-end px-4 mt-1 mb-2">
+                <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
+                  <div className="w-3 h-3 border border-green-500 flex items-center justify-center rounded-sm shrink-0">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                  </div>
+                  <span className="text-xs font-extrabold text-gray-700 tracking-wide uppercase">Veg Only</span>
+                  <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isVegOnly ? 'bg-green-500' : 'bg-gray-300'}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isVegOnly ? 'translate-x-4.5 translate-x-[18px]' : 'translate-x-1'}`} />
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={isVegOnly}
+                    onChange={(e) => setIsVegOnly(e.target.checked)}
+                  />
+                </label>
+              </div>
             </div>
 
             <div className="flex flex-col pb-20">
               {categories.filter(c => c !== 'All').map(category => {
-                 const itemsInCategory = menuItems.filter(item => (item.category || 'Main Course') === category);
+                 const itemsInCategory = menuItems.filter(item => (item.category || 'Main Course') === category && (!isVegOnly || item.isVeg !== false));
                  if (itemsInCategory.length === 0) return null;
                  return (
                    <div key={category} id={`category-${category.replace(/\s+/g, '-')}`} className="scroll-mt-[130px] mb-8">
                      <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">{category}</h2>
-                     <div className="grid grid-cols-1 gap-4">
+                     <div className="flex overflow-x-auto gap-4 no-scrollbar pb-2 snap-x">
                        {itemsInCategory.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3"
+                            className="bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3 min-w-[300px] w-[85%] shrink-0 snap-center"
                           >
                             {/* Left Column */}
                             <div className={`flex flex-col ${item.imageUrl ? 'w-[60%]' : 'w-full'}`}>
-                              {/* Zomato style Veg Tag */}
-                              <div className="w-4 h-4 border border-green-500 flex items-center justify-center rounded-sm mb-2 opacity-90">
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              </div>
+                              {/* Dynamic Veg/Non-Veg Tag */}
+                              {item.isVeg !== false ? (
+                                <div className="w-4 h-4 border border-green-600 flex items-center justify-center rounded-sm mb-2 opacity-90">
+                                  <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                                </div>
+                              ) : (
+                                <div className="w-4 h-4 border border-red-600 flex items-center justify-center rounded-sm mb-2 opacity-90">
+                                  <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-red-600 mt-0.5"></div>
+                                </div>
+                              )}
                               
                               <h3 className="text-[17px] font-bold text-gray-900 leading-snug">
                                 {item.name}
@@ -696,7 +729,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                         onClick={() => handleOptimisticAdd(item.id, 1)}
                                         className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100"
                                       >
-                                        ADD <span className="absolute top-0.5 right-1.5 text-[10px]">+</span>
+                                        ADD
                                       </button>
                                       {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                                         <button onClick={() => setItemBeingCustomized(item)} className="text-gray-400 text-[9px] mt-1 font-semibold text-center z-10 bg-white/90 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">

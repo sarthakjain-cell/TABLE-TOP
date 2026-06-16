@@ -47,6 +47,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
+  isVeg?: boolean;
   modifierGroups?: any;
   imageUrl?: string;
 }
@@ -93,6 +94,7 @@ export default function AdminPage() {
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
+  const [newDishIsVeg, setNewDishIsVeg] = useState(true);
   const [newDishModifierGroups, setNewDishModifierGroups] = useState<any[]>([]);
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -108,6 +110,7 @@ export default function AdminPage() {
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
+  const [editDishIsVeg, setEditDishIsVeg] = useState(true);
   const [editDishModifierGroups, setEditDishModifierGroups] = useState<any[]>([]);
   const [isUpdatingDish, setIsUpdatingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
@@ -533,7 +536,8 @@ export default function AdminPage() {
       }
     } else {
       setNewDishImageUrl('');
-      setNewDishModifierGroups([]);
+        setNewDishIsVeg(true);
+        setNewDishModifierGroups([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -1625,6 +1629,23 @@ export default function AdminPage() {
                       className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                       rows={1}
                     />
+                  </div>
+                  <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <span className="text-sm font-bold text-gray-700">Dietary Preference:</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditDishIsVeg(true)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${editDishIsVeg ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-white text-gray-500 border border-gray-300'}`}
+                    >
+                      🟢 VEG
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditDishIsVeg(false)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${!editDishIsVeg ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-white text-gray-500 border border-gray-300'}`}
+                    >
+                      🔺 NON-VEG
+                    </button>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Dish Photo</label>
