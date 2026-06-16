@@ -400,7 +400,25 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
               if (isHalfPortion && !menuItem.hasHalfPortion) {
                 throw new Error(`"${menuItem.name}" does not offer a half portion`);
               }
-              const itemPrice = isHalfPortion && menuItem.halfPrice ? menuItem.halfPrice : menuItem.price;
+              const basePrice = isHalfPortion && menuItem.halfPrice ? menuItem.halfPrice : menuItem.price;
+              let modifierPriceAdd = 0;
+              if (menuItem.modifierGroups && modifications) {
+                try {
+                  const groups = typeof menuItem.modifierGroups === 'string' ? JSON.parse(menuItem.modifierGroups) : menuItem.modifierGroups;
+                  if (Array.isArray(groups)) {
+                    for (const group of groups) {
+                      if (Array.isArray(group.options)) {
+                        for (const option of group.options) {
+                          if (modifications.includes(option.name) && option.price) {
+                            modifierPriceAdd += Number(option.price);
+                          }
+                        }
+                      }
+                    }
+                  }
+                } catch(e) { console.error('Error parsing modifier groups for price', e); }
+              }
+              const itemPrice = new Prisma.Decimal(basePrice).plus(modifierPriceAdd);
 
               await tx.orderItem.create({
                 data: {

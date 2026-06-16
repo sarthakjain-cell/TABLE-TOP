@@ -5,6 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { decimalMath } from '../../utils/decimalMath';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRouter } from 'next/navigation';
+import ModifierBuilder, { ModifierGroup } from './ModifierBuilder';
 import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
 
 interface OrderItem {
@@ -46,7 +47,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
-  allowsDietary?: boolean;
+  modifierGroups?: ModifierGroup[];
   imageUrl?: string;
 }
 
@@ -92,7 +93,7 @@ export default function AdminPage() {
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
-  const [newDishAllowsDietary, setNewDishAllowsDietary] = useState(true);
+  const [newDishModifierGroups, setNewDishModifierGroups] = useState<ModifierGroup[]>([]);
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export default function AdminPage() {
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
-  const [editDishAllowsDietary, setEditDishAllowsDietary] = useState(true);
+  const [editDishModifierGroups, setEditDishModifierGroups] = useState<ModifierGroup[]>([]);
   const [isUpdatingDish, setIsUpdatingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const editFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -532,7 +533,7 @@ export default function AdminPage() {
       }
     } else {
       setNewDishImageUrl('');
-      setNewDishAllowsDietary(true);
+      setNewDishModifierGroups([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -555,7 +556,7 @@ export default function AdminPage() {
           description: newDishDesc,
           category: newDishCategory || "Main Course",
           imageUrl: newDishImageUrl || undefined,
-          allowsDietary: newDishAllowsDietary
+          modifierGroups: newDishModifierGroups
         })
       });
       
@@ -564,7 +565,7 @@ export default function AdminPage() {
         setNewDishPrice('');
         setNewDishHasHalfPortion(false);
         setNewDishHalfPrice('');
-        setNewDishAllowsDietary(true);
+        setNewDishModifierGroups([]);
         setNewDishCategory('');
         setNewDishImageUrl('');
         fetch(`/api/menu?restaurantId=${restaurantId}`)
@@ -596,7 +597,7 @@ export default function AdminPage() {
           description: editDishDesc,
           category: editDishCategory || "Main Course",
           imageUrl: editDishImageUrl || undefined,
-          allowsDietary: editDishAllowsDietary
+          modifierGroups: editDishModifierGroups
         })
       });
       
@@ -649,7 +650,7 @@ export default function AdminPage() {
     setEditDishDesc(item.description || '');
     setEditDishCategory(item.category || 'Main Course');
     setEditDishImageUrl(item.imageUrl || '');
-    setEditDishAllowsDietary(item.allowsDietary !== false);
+    setEditDishModifierGroups(typeof item.modifierGroups === 'string' ? JSON.parse(item.modifierGroups) : item.modifierGroups || []);
     setEditingDish(item);
   };
 
@@ -1246,19 +1247,8 @@ export default function AdminPage() {
                         <p className="text-sm text-red-500 mt-1">{uploadError}</p>
                       )}
                     </div>
-                    <div className="mb-4">
-                      <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition">
-                        <input 
-                          type="checkbox" 
-                          checked={newDishAllowsDietary} 
-                          onChange={(e) => setNewDishAllowsDietary(e.target.checked)} 
-                          className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" 
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-800">Dietary Customization (⚙️)</span>
-                          <span className="text-gray-400 text-xs">Allows customers to request "No Onion", "No Garlic", etc.</span>
-                        </div>
-                      </label>
+                    <div className="mb-4 border-t border-gray-200 pt-4 mt-2">
+                      <ModifierBuilder groups={newDishModifierGroups} onChange={setNewDishModifierGroups} />
                     </div>
                     <button 
                       type="submit" 
@@ -1678,19 +1668,8 @@ export default function AdminPage() {
                     {uploadError && <p className="text-sm text-red-500 mt-1">{uploadError}</p>}
                   </div>
                   
-                  <div className="mb-4">
-                    <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition">
-                      <input 
-                        type="checkbox" 
-                        checked={editDishAllowsDietary} 
-                        onChange={(e) => setEditDishAllowsDietary(e.target.checked)} 
-                        className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" 
-                      />
-                      <div className="flex flex-col">
-                        <span className="font-bold text-gray-800">Dietary Customization (⚙️)</span>
-                        <span className="text-gray-400 text-xs">Allows customers to request "No Onion", "No Garlic", etc.</span>
-                      </div>
-                    </label>
+                  <div className="mb-4 border-t border-gray-200 pt-4 mt-2">
+                    <ModifierBuilder groups={editDishModifierGroups} onChange={setEditDishModifierGroups} />
                   </div>
                   
                   <div className="flex gap-3 pt-2">

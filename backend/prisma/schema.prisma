@@ -105,7 +105,7 @@ model MenuItem {
   category       String      @default("Main Course")
   imageUrl       String?     // Cloudinary URL for the dish photo
   isAvailable    Boolean     @default(true)
-  allowsDietary  Boolean     @default(true) // Whether the dish can be customized for dietary needs (e.g. Jain)
+  modifierGroups Json?       // Stores an array of modifier groups: [{ name: "Crust", isRequired: true, min: 1, max: 1, options: [{ name: "Pan", price: 0 }] }]
   restaurantId   String
   restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]

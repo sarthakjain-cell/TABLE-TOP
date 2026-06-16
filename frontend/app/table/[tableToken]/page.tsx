@@ -21,7 +21,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
-  allowsDietary?: boolean;
+  modifierGroups?: any;
   imageUrl?: string;
 }
 
@@ -51,6 +51,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   // Optimistic UI state for cart quantities
   const [itemBeingCustomized, setItemBeingCustomized] = useState<MenuItem | null>(null);
   const [customMods, setCustomMods] = useState<string[]>([]);
+  const [selectedModifiers, setSelectedModifiers] = useState<Record<string, string[]>>({});
   const [isHalfPortionMod, setIsHalfPortionMod] = useState(false);
 
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
@@ -592,7 +593,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                               >
                                 ADD HALF
                               </button>
-                              {item.allowsDietary !== false && (
+                              {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                                 <button onClick={() => setItemBeingCustomized(item)} className="bg-gray-100 text-gray-600 shadow-sm font-bold text-[11px] px-2 py-2 rounded-lg transition-all active:scale-95">
                                   ⚙️
                                 </button>
@@ -606,7 +607,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                               >
                                 ADD
                               </button>
-                              {item.allowsDietary !== false && (
+                              {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                                 <button onClick={() => setItemBeingCustomized(item)} className="bg-gray-100 text-gray-600 shadow-sm font-bold text-xs px-3 py-2 rounded-lg transition-all active:scale-95">
                                   ⚙️
                                 </button>
@@ -647,7 +648,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                             >
                               HALF
                             </button>
-                            {item.allowsDietary !== false && (
+                            {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                               <button onClick={() => setItemBeingCustomized(item)} className="bg-white text-gray-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg active:scale-95 transition-transform">
                                 ⚙️
                               </button>
@@ -661,7 +662,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                             >
                               ADD
                             </button>
-                            {item.allowsDietary !== false && (
+                            {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                               <button onClick={() => setItemBeingCustomized(item)} className="bg-white text-gray-600 border border-gray-200 shadow-md font-extrabold text-xs px-2 py-2 rounded-lg active:scale-95 transition-transform">
                                 ⚙️
                               </button>
@@ -762,6 +763,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         setPaymentProcessing(false);
                         if (res?.success) {
                           if (tableSession.paymentMode === 'PRE_PAY') {
+                            setSelectedModifiers({});
                             setCheckoutMode('PAY_FULL');
                             setActiveTab('billing');
                           } else {
@@ -1284,37 +1286,106 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             </div>
             
             <div className="overflow-y-auto custom-scrollbar pr-2 mb-4">
-              <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">Dietary & Preferences</p>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {['Jain (No Onion/Garlic)', 'No Onion', 'No Garlic', 'Extra Spicy', 'Less Spicy', 'Make it Vegan', 'Allergy Alert'].map(preset => {
-                  const isSelected = customMods.includes(preset);
+              {(() => {
+                let groups = [];
+                try {
+                  groups = typeof itemBeingCustomized.modifierGroups === 'string' 
+                    ? JSON.parse(itemBeingCustomized.modifierGroups) 
+                    : itemBeingCustomized.modifierGroups || [];
+                } catch(e) {}
+                
+                if (groups.length === 0) {
                   return (
-                    <button
-                      key={preset}
-                      onClick={() => {
-                        setCustomMods(prev => isSelected ? prev.filter(m => m !== preset) : [...prev, preset]);
-                      }}
-                      className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'}`}
-                    >
-                      {preset}
-                    </button>
+                    <div className="text-gray-500 italic text-center py-4">No custom options available.</div>
                   );
-                })}
-              </div>
+                }
+
+                return groups.map((group: any, gIdx: number) => (
+                  <div key={gIdx} className="mb-6">
+                    <div className="flex justify-between items-end mb-3">
+                      <p className="text-sm font-bold text-gray-800 uppercase tracking-widest">{group.name}</p>
+                      <span className="text-xs font-semibold text-gray-400">
+                        {group.isRequired ? 'Required' : 'Optional'} 
+                        {group.max > 1 ? ` (Up to ${group.max})` : ''}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {group.options.map((opt: any) => {
+                        const isSelected = (selectedModifiers[group.name] || []).includes(opt.name);
+                        return (
+                          <button
+                            key={opt.name}
+                            onClick={() => {
+                              setSelectedModifiers(prev => {
+                                const current = prev[group.name] || [];
+                                if (isSelected) {
+                                  return { ...prev, [group.name]: current.filter(x => x !== opt.name) };
+                                } else {
+                                  if (group.max === 1) {
+                                    return { ...prev, [group.name]: [opt.name] };
+                                  } else if (current.length < group.max) {
+                                    return { ...prev, [group.name]: [...current, opt.name] };
+                                  }
+                                  return prev;
+                                }
+                              });
+                            }}
+                            className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all flex items-center gap-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                          >
+                            {opt.name}
+                            {opt.price > 0 && <span className={`text-xs ${isSelected ? 'text-indigo-200' : 'text-gray-400'}`}>+${opt.price}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
 
             <div className="mt-auto pt-4 border-t border-gray-100">
-              <button
-                onClick={() => {
-                  let finalMods = [...customMods];
-                  if (isHalfPortionMod) finalMods.push('Half Portion');
-                  handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods);
-                  setItemBeingCustomized(null);
-                }}
-                className="w-full bg-indigo-600 text-white font-black text-lg py-4 rounded-2xl shadow-xl shadow-indigo-600/30 active:scale-[0.98] transition-transform"
-              >
-                Add to Cart ${isHalfPortionMod ? itemBeingCustomized.halfPrice : itemBeingCustomized.price}
-              </button>
+              {(() => {
+                let groups = [];
+                try {
+                  groups = typeof itemBeingCustomized.modifierGroups === 'string' 
+                    ? JSON.parse(itemBeingCustomized.modifierGroups) 
+                    : itemBeingCustomized.modifierGroups || [];
+                } catch(e) {}
+                
+                // Validate required groups
+                const missingRequired = groups.some((g: any) => g.isRequired && (selectedModifiers[g.name] || []).length < g.min);
+                
+                // Calculate total price
+                const basePrice = isHalfPortionMod ? parseFloat(itemBeingCustomized.halfPrice || '0') : parseFloat(itemBeingCustomized.price);
+                let extraPrice = 0;
+                groups.forEach((g: any) => {
+                  const selected = selectedModifiers[g.name] || [];
+                  g.options.forEach((opt: any) => {
+                    if (selected.includes(opt.name)) {
+                      extraPrice += parseFloat(opt.price || 0);
+                    }
+                  });
+                });
+                const finalPrice = basePrice + extraPrice;
+
+                return (
+                  <button
+                    disabled={missingRequired}
+                    onClick={() => {
+                      let finalMods = [];
+                      if (isHalfPortionMod) finalMods.push('Half Portion');
+                      Object.values(selectedModifiers).forEach(arr => {
+                        finalMods.push(...arr);
+                      });
+                      handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods);
+                      setItemBeingCustomized(null);
+                    }}
+                    className={`w-full font-black text-lg py-4 rounded-2xl shadow-xl active:scale-[0.98] transition-all ${missingRequired ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-600/30'}`}
+                  >
+                    {missingRequired ? 'Complete Required Selections' : `Add to Cart $${finalPrice.toFixed(2)}`}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1332,6 +1403,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 <button
                   key={req}
                   onClick={() => {
+                    setSelectedModifiers({});
                     requestHelp(req);
                     setShowBellModal(false);
                     alert(`Request sent: ${req}`);

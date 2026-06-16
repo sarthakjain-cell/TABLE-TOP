@@ -14,7 +14,7 @@ interface CreateMenuItemBody {
   hasHalfPortion?: boolean;
   category?: string;
   imageUrl?: string;
-  allowsDietary?: boolean;
+  modifierGroups?: any;
 }
 
 interface UpdateMenuItemBody {
@@ -25,7 +25,7 @@ interface UpdateMenuItemBody {
   hasHalfPortion?: boolean;
   category?: string;
   imageUrl?: string;
-  allowsDietary?: boolean;
+  modifierGroups?: any;
 }
 
 interface ToggleAvailabilityBody {
@@ -56,13 +56,12 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           hasHalfPortion: { type: 'boolean', nullable: true },
           category: { type: 'string', maxLength: 100, nullable: true },
           imageUrl: imageUrlSchema,
-          allowsDietary: { type: 'boolean', nullable: true },
+          modifierGroups: { type: 'array', nullable: true },
         },
       },
     },
   }, async (request, reply) => {
-    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl,
-          allowsDietary: allowsDietary !== undefined ? allowsDietary : true, allowsDietary } = request.body;
+    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, modifierGroups } = request.body as any;
     const restaurantId = request.user!.restaurantId;
 
     try {
@@ -76,6 +75,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           hasHalfPortion: hasHalfPortion || false,
           category: category || "Main Course",
           imageUrl,
+          modifierGroups: modifierGroups || null,
         },
       });
       const io = getIO();
@@ -153,13 +153,13 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           hasHalfPortion: { type: 'boolean', nullable: true },
           category: { type: 'string', maxLength: 100, nullable: true },
           imageUrl: imageUrlSchema,
-          allowsDietary: { type: 'boolean', nullable: true },
+          modifierGroups: { type: 'array', nullable: true },
         },
       },
     },
   }, async (request, reply) => {
     const { id } = request.params;
-    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, allowsDietary } = request.body;
+    const { name, description, price, halfPrice, hasHalfPortion, category, imageUrl, modifierGroups } = request.body as any;
     const restaurantId = request.user!.restaurantId;
 
     try {
@@ -181,7 +181,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           hasHalfPortion: hasHalfPortion !== undefined ? hasHalfPortion : undefined,
           category,
           imageUrl: imageUrl !== undefined ? imageUrl : undefined,
-          allowsDietary: allowsDietary !== undefined ? allowsDietary : undefined,
+          modifierGroups: modifierGroups !== undefined ? modifierGroups : undefined,
         },
       });
       const io = getIO();
