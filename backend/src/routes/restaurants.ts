@@ -18,6 +18,7 @@ interface UpdateSettingsBody {
   roomServiceFee?: number;
   upiId?: string;
   merchantName?: string;
+  logoUrl?: string;
 }
 
 export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -148,7 +149,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   // Update Settings (Establishment Type & Delivery Fee)
   fastify.patch<{ Params: { id: string }; Body: UpdateSettingsBody }>('/api/restaurants/:id/settings', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
-    const { establishmentType, paymentMode, roomServiceFee, upiId, merchantName } = request.body;
+    const { establishmentType, paymentMode, roomServiceFee, upiId, merchantName, logoUrl } = request.body;
 
     if (request.user!.restaurantId !== id) {
       return reply.code(403).send({ error: 'Forbidden: Cannot update settings for a different restaurant' });
@@ -172,6 +173,9 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
       if (merchantName !== undefined) {
         data.merchantName = merchantName;
       }
+      if (logoUrl !== undefined) {
+        data.logoUrl = logoUrl;
+      }
 
       const updatedRestaurant = await prisma.restaurant.update({
         where: { id },
@@ -185,7 +189,8 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
         paymentMode: updatedRestaurant.paymentMode,
         roomServiceFee: updatedRestaurant.roomServiceFee,
         upiId: updatedRestaurant.upiId,
-        merchantName: updatedRestaurant.merchantName
+        merchantName: updatedRestaurant.merchantName,
+        logoUrl: updatedRestaurant.logoUrl
       });
 
       return updatedRestaurant;

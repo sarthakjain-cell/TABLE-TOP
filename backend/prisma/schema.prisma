@@ -59,6 +59,7 @@ model Restaurant {
   taxRate           Decimal           @db.Decimal(5, 4) // e.g. 0.0825 for 8.25%
   upiId             String?
   merchantName      String?
+  logoUrl           String?     // Cloudinary URL for the brand logo
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   tables            Table[]
@@ -105,6 +106,7 @@ model MenuItem {
   category       String      @default("Main Course")
   imageUrl       String?     // Cloudinary URL for the dish photo
   isAvailable    Boolean     @default(true)
+  isVeg          Boolean     @default(true)
   modifierGroups Json?       // Stores an array of modifier groups: [{ name: "Crust", isRequired: true, min: 1, max: 1, options: [{ name: "Pan", price: 0 }] }]
   restaurantId   String
   restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)

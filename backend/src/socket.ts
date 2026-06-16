@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
 import { prisma } from './prisma';
+import { Prisma } from '@prisma/client';
 import { Decimal } from 'decimal.js';
 
 export interface ServerToClientEvents {

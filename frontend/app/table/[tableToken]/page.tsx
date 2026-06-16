@@ -527,9 +527,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       <header className="glass border-b border-gray-100 sticky top-0 z-40 p-4 shadow-soft">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-black text-xl shadow-sm border border-brand-primary/20 shrink-0">
-              {(restaurant?.name || 'T')[0].toUpperCase()}
-            </div>
+            {restaurant?.logoUrl ? (
+              <div className="w-11 h-11 rounded-full border border-gray-200 shrink-0 bg-white overflow-hidden shadow-sm">
+                <img src={restaurant.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-11 h-11 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-black text-xl shadow-sm border border-brand-primary/20 shrink-0">
+                {(restaurant?.name || 'T')[0].toUpperCase()}
+              </div>
+            )}
             <div className="flex flex-col justify-center">
               <h1 className="text-[19px] font-black text-gray-900 tracking-tight leading-none mb-1.5 capitalize">
                 {restaurant?.name || 'Table Top'}
@@ -710,8 +716,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
                             {/* Right Column (Image) */}
                             {item.imageUrl && (
-                              <div className="relative w-[40%] max-w-[130px] shrink-0 flex flex-col items-center mt-2">
-                                <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden shadow-sm bg-gray-50">
+                              <div className="relative w-[42%] max-w-[150px] shrink-0 flex flex-col items-center mt-2">
+                                <div className="aspect-[4/5] w-full rounded-2xl overflow-hidden shadow-sm bg-gray-50">
                                   <img 
                                     src={`${item.imageUrl}?v=${imageCacheBuster.current}`}
                                     alt={item.name} 

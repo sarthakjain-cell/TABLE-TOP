@@ -74,6 +74,8 @@ export default function AdminPage() {
   const [taxRate, setTaxRate] = useState<number>(0);
   const [upiId, setUpiId] = useState('');
   const [merchantName, setMerchantName] = useState('');
+  const [restaurantLogoUrl, setRestaurantLogoUrl] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'PRE_PAY' | 'POST_PAY'>('POST_PAY');
   
   const [tables, setTables] = useState<Table[]>([]);
@@ -376,12 +378,46 @@ export default function AdminPage() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent) => {
+    e.preventDefault();
+    const file = 'dataTransfer' in e ? (e as React.DragEvent).dataTransfer.files[0] : (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be less than 5MB");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'tabletop_menu_items');
+    formData.append('folder', 'restaurant_logos');
+
+    try {
+      const response = await fetch(`https://api.cloudinary.com/v1_1/dx8d9i60t/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      setRestaurantLogoUrl(data.secure_url);
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const savePaymentSettings = async () => {
     try {
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ establishmentType, paymentMode, upiId, merchantName })
+        body: JSON.stringify({ establishmentType, paymentMode, upiId, merchantName, logoUrl: restaurantLogoUrl })
       });
       if (!res.ok) throw new Error('Failed to save settings');
       alert('Payment settings saved successfully!');
@@ -400,13 +436,14 @@ export default function AdminPage() {
       }
     };
 
-    const handleSettingsChange = (data: { restaurantId: string, establishmentType: 'RESTAURANT' | 'HOTEL', paymentMode: 'PRE_PAY' | 'POST_PAY', roomServiceFee: string, upiId?: string, merchantName?: string }) => {
+    const handleSettingsChange = (data: { restaurantId: string, establishmentType: 'RESTAURANT' | 'HOTEL', paymentMode: 'PRE_PAY' | 'POST_PAY', roomServiceFee: string, upiId?: string, merchantName?: string, logoUrl?: string }) => {
       if (data.restaurantId === restaurantId) {
         setEstablishmentType(data.establishmentType);
         if (data.paymentMode) setPaymentMode(data.paymentMode);
         if (data.roomServiceFee) setRoomServiceFee(data.roomServiceFee.toString());
         if (data.upiId !== undefined) setUpiId(data.upiId);
         if (data.merchantName !== undefined) setMerchantName(data.merchantName);
+        if (data.logoUrl !== undefined) setRestaurantLogoUrl(data.logoUrl || '');
       }
     };
     
@@ -1491,7 +1528,39 @@ export default function AdminPage() {
                       className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                   </div>
-                  <div className="pt-4 flex justify-end">
+                  <div className="pt-4 border-t border-gray-200 mt-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Brand Logo</label>
+                    <div className="flex items-center gap-6">
+                      <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
+                        {restaurantLogoUrl ? (
+                          <img src={restaurantLogoUrl} alt="Logo" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-gray-400 text-xs text-center px-2">No Logo</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="file"
+                          id="logoUpload"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          disabled={isUploadingLogo}
+                        />
+                        <label
+                          htmlFor="logoUpload"
+                          className={`inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer ${isUploadingLogo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {isUploadingLogo ? 'Uploading...' : 'Upload New Logo'}
+                        </label>
+                        <p className="mt-2 text-xs text-gray-500">JPG, PNG, GIF up to 5MB. Recommended size: 512x512px.</p>
+                        {restaurantLogoUrl && (
+                          <button onClick={() => setRestaurantLogoUrl('')} className="mt-2 text-xs text-red-600 hover:text-red-800 font-medium">Remove Logo</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-6 flex justify-end">
                     <button
                       onClick={savePaymentSettings}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-sm transition-colors"
