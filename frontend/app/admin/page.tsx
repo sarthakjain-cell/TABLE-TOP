@@ -92,6 +92,7 @@ export default function AdminPage() {
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
   const [newDishAllowsDietary, setNewDishAllowsDietary] = useState(true);
+  const [newDishAllowsDietary, setNewDishAllowsDietary] = useState(true);
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -106,6 +107,7 @@ export default function AdminPage() {
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
+  const [editDishAllowsDietary, setEditDishAllowsDietary] = useState(true);
   const [editDishAllowsDietary, setEditDishAllowsDietary] = useState(true);
   const [isUpdatingDish, setIsUpdatingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
@@ -553,7 +555,8 @@ export default function AdminPage() {
           hasHalfPortion: newDishHasHalfPortion,
           description: newDishDesc,
           category: newDishCategory || "Main Course",
-          imageUrl: newDishImageUrl || undefined
+          imageUrl: newDishImageUrl || undefined,
+          allowsDietary: newDishAllowsDietary
         })
       });
       
@@ -562,7 +565,8 @@ export default function AdminPage() {
         setNewDishPrice('');
         setNewDishHasHalfPortion(false);
         setNewDishHalfPrice('');
-        setNewDishDesc('');
+        setNewDishAllowsDietary(true);
+        fetchMenu(restaurantId);
         setNewDishCategory('');
         setNewDishImageUrl('');
         fetch(`/api/menu?restaurantId=${restaurantId}`)
@@ -593,7 +597,8 @@ export default function AdminPage() {
           hasHalfPortion: editDishHasHalfPortion,
           description: editDishDesc,
           category: editDishCategory || "Main Course",
-          imageUrl: editDishImageUrl || undefined
+          imageUrl: editDishImageUrl || undefined,
+          allowsDietary: editDishAllowsDietary
         })
       });
       
@@ -646,6 +651,8 @@ export default function AdminPage() {
     setEditDishDesc(item.description || '');
     setEditDishCategory(item.category || 'Main Course');
     setEditDishImageUrl(item.imageUrl || '');
+    setEditDishAllowsDietary(item.allowsDietary !== false);
+    setDishToEdit(item);
   };
 
   const toggleDishAvailability = async (id: string, currentStatus: boolean) => {
@@ -1240,6 +1247,20 @@ export default function AdminPage() {
                       {uploadError && (
                         <p className="text-sm text-red-500 mt-1">{uploadError}</p>
                       )}
+                    </div>
+                    <div className="mb-4">
+                      <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition">
+                        <input 
+                          type="checkbox" 
+                          checked={newDishAllowsDietary} 
+                          onChange={(e) => setNewDishAllowsDietary(e.target.checked)} 
+                          className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" 
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-800">Dietary Customization (⚙️)</span>
+                          <span className="text-gray-400 text-xs">Allows customers to request "No Onion", "No Garlic", etc.</span>
+                        </div>
+                      </label>
                     </div>
                     <button 
                       type="submit" 
