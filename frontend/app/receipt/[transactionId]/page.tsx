@@ -8,9 +8,7 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
   const [isVerified, setIsVerified] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
-  const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
-  const [whatsappSent, setWhatsappSent] = useState(false);
+
   const [waPhone, setWaPhone] = useState('');
   const [isSendingWa, setIsSendingWa] = useState(false);
 
@@ -46,32 +44,7 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
     }
   };
 
-  const handleSendWhatsApp = async () => {
-    if (!whatsappNumber) {
-      alert("Please enter your WhatsApp number");
-      return;
-    }
-    
-    setIsSendingWhatsApp(true);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/receipt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: whatsappNumber, transactionId: transaction.id })
-      });
-      if (!res.ok) {
-        throw new Error('Failed to send receipt via WhatsApp');
-      }
-      setWhatsappSent(true);
-      setTimeout(() => setWhatsappSent(false), 5000);
-      setWhatsappNumber('');
-    } catch (err) {
-      console.error(err);
-      alert('Network error while sending receipt');
-    } finally {
-      setIsSendingWhatsApp(false);
-    }
-  };
+
 
   const handleDownloadPDF = async () => {
     if (typeof window === 'undefined' || !(window as any).html2pdf) {
@@ -105,12 +78,18 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
       alert('Please enter a phone number first.');
       return;
     }
+    
+    let formattedPhone = waPhone.replace(/\D/g, '');
+    if (formattedPhone.length === 10) {
+      formattedPhone = '91' + formattedPhone;
+    }
+
     setIsSendingWa(true);
     try {
       const res = await fetch('/api/receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: waPhone, transactionId: params.transactionId })
+        body: JSON.stringify({ phone: formattedPhone, transactionId: params.transactionId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send WhatsApp receipt');
@@ -272,13 +251,20 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Resend via WhatsApp</label>
             <div className="flex gap-2">
-              <input 
-                type="tel" 
-                placeholder="Phone Number" 
-                value={waPhone} 
-                onChange={(e) => setWaPhone(e.target.value)}
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 font-bold">+91</span>
+                  <span className="text-gray-300 mx-2">|</span>
+                </div>
+                <input 
+                  type="tel" 
+                  placeholder="Phone Number" 
+                  value={waPhone} 
+                  onChange={(e) => setWaPhone(e.target.value.replace(/\D/g, ''))}
+                  maxLength={10}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-14 pr-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
               <button 
                 onClick={handleResendWhatsApp}
                 disabled={isSendingWa || !waPhone}
