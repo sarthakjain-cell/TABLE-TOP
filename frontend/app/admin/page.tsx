@@ -392,18 +392,22 @@ export default function AdminPage() {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', 'tabletop_menu_items');
-    formData.append('folder', 'restaurant_logos');
 
     try {
-      const response = await fetch(`https://api.cloudinary.com/v1_1/dx8d9i60t/image/upload`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const uploadEndpoint = apiUrl ? `${apiUrl}/api/upload` : '/api/upload';
+
+      const response = await fetch(uploadEndpoint, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
         body: formData,
       });
 
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
-      setRestaurantLogoUrl(data.secure_url);
+      setRestaurantLogoUrl(data.url);
     } catch (err) {
       console.error('Image upload failed:', err);
       alert('Failed to upload image. Please try again.');
