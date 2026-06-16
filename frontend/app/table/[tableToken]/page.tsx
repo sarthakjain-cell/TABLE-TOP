@@ -520,7 +520,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const upiString = `upi://pay?pa=${encodedUpiId}&pn=${encodedMerchantName}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Session_${tableSession?.sessionId}`;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative shadow-2xl pb-24">
+    <div className="min-h-screen bg-gray-50 flex flex-col w-full relative pb-24">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       {/* 1. Contextual Mode Header */}
       <header className="glass border-b border-gray-100 sticky top-0 z-40 p-4 shadow-soft">
@@ -629,18 +629,18 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               </div>
             </div>
 
-            <div className="flex flex-col pb-20">
+            <div className="flex flex-col pb-20 px-2 md:px-6">
               {categories.filter(c => c !== 'All').map(category => {
                  const itemsInCategory = menuItems.filter(item => (item.category || 'Main Course') === category && (!isVegOnly || item.isVeg !== false));
                  if (itemsInCategory.length === 0) return null;
                  return (
                    <div key={category} id={`category-${category.replace(/\s+/g, '-')}`} className="scroll-mt-[130px] mb-8">
                      <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">{category}</h2>
-                     <div className="flex overflow-x-auto gap-4 no-scrollbar pb-2 snap-x">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-2 pb-2">
                        {itemsInCategory.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3 min-w-[300px] w-[85%] shrink-0 snap-center"
+                            className="bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3 w-full h-full"
                           >
                             {/* Left Column */}
                             <div className={`flex flex-col ${item.imageUrl ? 'w-[60%]' : 'w-full'}`}>
@@ -928,7 +928,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           <div>
             {checkoutMode === 'CHOICE' && (
               <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6">
+                <div className="bg-white w-full max-w-2xl rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6 mx-auto">
                   <div className="text-center">
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">How would you like to pay?</h2>
                     <p className="text-gray-500 text-sm mt-2 font-medium">Choose a payment method for this table.</p>
@@ -1131,7 +1131,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
             {checkoutMode === 'CHARGE_ROOM' && (
               <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6">
+                <div className="bg-white w-full max-w-2xl rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6 mx-auto">
                   <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2 text-center justify-center">
                     <span>🛎️</span> Charge to Room
                   </h2>
@@ -1186,7 +1186,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             
             {checkoutMode === 'SUCCESS' && (
               <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-                <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6 text-center">
+                <div className="bg-white w-full max-w-2xl rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6 text-center mx-auto">
                   <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
                     <span className="text-5xl">✅</span>
                   </div>
@@ -1227,7 +1227,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         {/* 5. Multiplayer Split Payment Lobby Modal */}
         {splitLobby && !splitLobby.isComplete && (
           <div className="fixed inset-0 bg-slate-900/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in">
-            <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="bg-white w-full max-w-2xl mx-auto rounded-3xl p-6 shadow-2xl relative overflow-hidden">
                             {localClaimedSplitId ? (() => {
                 const mySplit = splitLobby.splits.find(s => s.id === localClaimedSplitId);
                 if (!mySplit) return null;
@@ -1528,10 +1528,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
       {/* Floating View Cart Pill (Swiggy Style) */}
       {activeTab === 'menu' && tableSession.cart.items.length > 0 && (
-        <div className="fixed bottom-[80px] left-0 right-0 max-w-md mx-auto px-4 z-40 animate-slide-up">
+        <div className="fixed bottom-[80px] left-0 right-0 w-full px-4 md:px-8 lg:px-12 z-40 animate-slide-up flex justify-center">
           <button 
             onClick={() => setActiveTab('cart')}
-            className="w-full bg-green-600 text-white rounded-2xl p-4 shadow-float flex justify-between items-center btn-tactile"
+            className="w-full max-w-2xl bg-green-600 text-white rounded-2xl p-4 shadow-float flex justify-between items-center btn-tactile"
           >
             <div className="flex flex-col items-start">
               <span className="text-sm font-extrabold uppercase tracking-wider">
@@ -1548,7 +1548,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       )}
 
       {/* 5. Sticky Bottom Action Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass border-t border-gray-100 pb-safe z-40">
+      <nav className="fixed bottom-0 left-0 right-0 w-full glass border-t border-gray-100 pb-safe z-40 flex justify-center">
         <div className="flex justify-around items-stretch p-2">
           <button
             onClick={() => setActiveTab('menu')}
