@@ -526,9 +526,23 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       {/* 1. Contextual Mode Header */}
       <header className="glass border-b border-gray-100 sticky top-0 z-40 p-4 shadow-soft">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-extrabold text-brand-dark tracking-tight">{restaurant?.name || 'Table Top'}</h1>
-            <p className="text-xs text-gray-500 font-semibold uppercase tracking-widest mt-1">{isHotel ? 'Room' : 'Table'} {tableSession.tableNumber}</p>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-black text-xl shadow-sm border border-brand-primary/20 shrink-0">
+              {(restaurant?.name || 'T')[0].toUpperCase()}
+            </div>
+            <div className="flex flex-col justify-center">
+              <h1 className="text-[19px] font-black text-gray-900 tracking-tight leading-none mb-1.5 capitalize">
+                {restaurant?.name || 'Table Top'}
+              </h1>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] text-gray-600 font-extrabold uppercase tracking-widest bg-gray-100/80 px-2 py-0.5 rounded shadow-sm border border-gray-200/50">
+                  {isHotel ? 'Room' : 'Table'} {tableSession.tableNumber}
+                </span>
+                <span className="flex items-center gap-0.5 text-[9px] text-white bg-green-600 px-1.5 py-0.5 rounded font-extrabold shadow-sm">
+                  ★ 4.4
+                </span>
+              </div>
+            </div>
           </div>
           {tableSession.restaurantMode === 'FULL_SERVICE' ? (
             <button
