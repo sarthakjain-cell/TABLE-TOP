@@ -592,14 +592,26 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                               >
                                 ADD HALF
                               </button>
+                              {item.allowsDietary !== false && (
+                                <button onClick={() => setItemBeingCustomized(item)} className="bg-gray-100 text-gray-600 shadow-sm font-bold text-[11px] px-2 py-2 rounded-lg transition-all active:scale-95">
+                                  ⚙️
+                                </button>
+                              )}
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleOptimisticAdd(item.id, 1)}
-                              className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-xs px-6 py-2 rounded-lg uppercase transition-all active:scale-95"
-                            >
-                              ADD
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleOptimisticAdd(item.id, 1)}
+                                className="bg-white text-green-600 border border-green-600 shadow-sm font-bold text-xs px-6 py-2 rounded-lg uppercase transition-all active:scale-95"
+                              >
+                                ADD
+                              </button>
+                              {item.allowsDietary !== false && (
+                                <button onClick={() => setItemBeingCustomized(item)} className="bg-gray-100 text-gray-600 shadow-sm font-bold text-xs px-3 py-2 rounded-lg transition-all active:scale-95">
+                                  ⚙️
+                                </button>
+                              )}
+                            </div>
                           )
                         ) : (
                           <span className="text-xs text-red-500 font-extrabold">Out of Stock</span>
@@ -635,14 +647,26 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                             >
                               HALF
                             </button>
+                            {item.allowsDietary !== false && (
+                              <button onClick={() => setItemBeingCustomized(item)} className="bg-white text-gray-600 border border-gray-200 shadow-md font-extrabold text-[9px] px-1 py-2 rounded-lg active:scale-95 transition-transform">
+                                ⚙️
+                              </button>
+                            )}
                           </div>
                         ) : (
-                          <button
-                            onClick={() => handleOptimisticAdd(item.id, 1)}
-                            className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-xs px-6 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform"
-                          >
-                            ADD
-                          </button>
+                          <div className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 flex gap-1">
+                            <button
+                              onClick={() => handleOptimisticAdd(item.id, 1)}
+                              className="bg-white text-green-600 border border-gray-200 shadow-md font-extrabold text-xs px-4 py-2 rounded-lg uppercase whitespace-nowrap active:scale-95 transition-transform"
+                            >
+                              ADD
+                            </button>
+                            {item.allowsDietary !== false && (
+                              <button onClick={() => setItemBeingCustomized(item)} className="bg-white text-gray-600 border border-gray-200 shadow-md font-extrabold text-xs px-2 py-2 rounded-lg active:scale-95 transition-transform">
+                                ⚙️
+                              </button>
+                            )}
+                          </div>
                         )
                       ) : (
                         <div className="absolute bottom-[-12px] left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-400 border border-gray-200 shadow-sm font-bold text-[10px] px-3 py-1 rounded-lg uppercase whitespace-nowrap">

@@ -91,6 +91,7 @@ export default function AdminPage() {
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
+  const [newDishAllowsDietary, setNewDishAllowsDietary] = useState(true);
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -105,6 +106,7 @@ export default function AdminPage() {
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
+  const [editDishAllowsDietary, setEditDishAllowsDietary] = useState(true);
   const [isUpdatingDish, setIsUpdatingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const editFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -529,6 +531,7 @@ export default function AdminPage() {
       }
     } else {
       setNewDishImageUrl('');
+      setNewDishAllowsDietary(true);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
