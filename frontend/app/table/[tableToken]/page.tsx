@@ -44,7 +44,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'menu' | 'cart' | 'orders' | 'billing'>('menu');
-  const [checkoutMode, setCheckoutMode] = useState<'IDLE' | 'CHOICE' | 'PAY_FULL' | 'SPLIT' | 'CHARGE_ROOM' | 'SUCCESS'>('IDLE');
+  const [checkoutMode, setCheckoutMode] = useState<'IDLE' | 'CHOICE' | 'PAY_FULL' | 'SPLIT' | 'CHARGE_ROOM' | 'WAITING_WAITER' | 'SUCCESS'>('IDLE');
   const [showBellModal, setShowBellModal] = useState(false);
   const [showPickupAlert, setShowPickupAlert] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
@@ -388,7 +388,20 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           // Skip Razorpay for CASH
           setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
           setShowUpiOptions(false);
-          setCheckoutMode('SUCCESS');
+          
+          if (tableSession?.paymentMode === 'PRE_PAY') {
+            const pendingOrders = tableSession?.orders?.filter((o: any) => o.status === 'PAYMENT_PENDING').map((o: any) => o.orderId) || [];
+            if (pendingOrders.length > 0) {
+              setWaitingOrderIds(pendingOrders);
+              setWaitingForWaiterApproval(true);
+              setCheckoutMode('WAITING_WAITER');
+            } else {
+              setCheckoutMode('SUCCESS');
+            }
+          } else {
+            setCheckoutMode('SUCCESS');
+          }
+          
           setPaymentProcessing(false);
           return;
         }
@@ -1178,6 +1191,20 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               </div>
             )}
 
+            
+            {checkoutMode === 'WAITING_WAITER' && (
+              <div className="animate-fade-in space-y-6 pb-8 text-center mt-12">
+                <div className="mx-auto w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center animate-pulse">
+                  <span className="text-4xl">⏳</span>
+                </div>
+                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Waiting for Waiter</h2>
+                <p className="text-gray-500 font-medium">Please wait while the waiter comes to your table to collect the cash and verify your payment.</p>
+                <div className="bg-orange-50 border border-orange-200 text-orange-800 p-4 rounded-xl text-sm font-bold mt-4">
+                  Your order will be sent to the kitchen as soon as the waiter verifies the payment.
+                </div>
+              </div>
+            )}
+            
             {checkoutMode === 'SUCCESS' && (
               <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-4 backdrop-blur-md animate-fade-in">
                 <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-scale-up space-y-6 text-center">
