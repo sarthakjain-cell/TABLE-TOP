@@ -490,21 +490,21 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative shadow-2xl pb-24">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       {/* 1. Contextual Mode Header */}
-      <header className="bg-white border-b sticky top-0 z-40 p-4 shadow-sm">
+      <header className="bg-white border-b-2 border-black sticky top-0 z-40 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">{restaurant?.name || 'Table Top'}</h1>
-            <p className="text-xs text-gray-500 font-medium">{isHotel ? 'Room' : 'Table'} Number: {tableSession.tableNumber}</p>
+            <h1 className="text-2xl font-black text-black tracking-tight">{restaurant?.name || 'Table Top'}</h1>
+            <p className="text-sm text-gray-700 font-bold uppercase tracking-widest">{isHotel ? 'Room' : 'Table'}: {tableSession.tableNumber}</p>
           </div>
           {tableSession.restaurantMode === 'FULL_SERVICE' ? (
             <button
               onClick={() => setShowBellModal(true)}
-              className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-sm font-semibold active:bg-indigo-100 flex items-center gap-1 border border-indigo-100 shadow-sm"
+              className="bg-brand-orange text-black border-2 border-black px-4 py-2 font-black uppercase text-xs shadow-brutal btn-brutal transition-transform flex items-center gap-2"
             >
               🔔 {isHotel ? 'Room Service' : 'Call Waiter'}
             </button>
           ) : (
-            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold animate-pulse">
+            <div className="bg-yellow-300 border-2 border-black text-black px-3 py-1 text-xs font-black uppercase shadow-brutal-sm">
               Self-Service Mode
             </div>
           )}
@@ -529,16 +529,16 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
         {activeTab === 'menu' && (
           <div className="pb-8">
-            <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md py-3 mb-2 -mx-4 px-4 border-b border-gray-100">
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+            <div className="sticky top-0 z-50 bg-white py-3 mb-4 -mx-4 px-4 border-b-2 border-black">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                 {categories.map(c => (
                   <button 
                     key={c}
                     onClick={() => setActiveCategory(c)}
-                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
+                    className={`whitespace-nowrap px-5 py-2 font-black uppercase text-xs border-2 border-black transition-all ${
                       activeCategory === c 
-                        ? 'bg-gray-900 text-white' 
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                        ? 'bg-black text-white shadow-brutal' 
+                        : 'bg-white text-black hover:bg-gray-100 shadow-brutal-sm'
                     }`}
                   >
                     {c}
@@ -1417,38 +1417,38 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       )}
 
       {/* 5. Sticky Bottom Action Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t p-2 flex justify-around items-center z-40 shadow-lg">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t-4 border-black p-0 flex justify-around items-stretch z-40 shadow-[0_-4px_0_rgba(0,0,0,1)]">
         <button
           onClick={() => setActiveTab('menu')}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
-            activeTab === 'menu' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
+          className={`flex-1 flex flex-col items-center justify-center py-3 border-r-2 border-black ${
+            activeTab === 'menu' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
           }`}
         >
-          <span className="text-xl">📋</span>
-          <span className="text-[10px]">Menu</span>
+          <span className="text-2xl mb-1">📋</span>
+          <span className="text-[11px] font-black uppercase tracking-wider">Menu</span>
         </button>
         <button
           onClick={() => setActiveTab('cart')}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl relative ${
-            activeTab === 'cart' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
+          className={`flex-1 flex flex-col items-center justify-center py-3 border-r-2 border-black relative ${
+            activeTab === 'cart' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
           }`}
         >
-          <span className="text-xl">🛒</span>
-          <span className="text-[10px]">Shared Cart</span>
+          <span className="text-2xl mb-1">🛒</span>
+          <span className="text-[11px] font-black uppercase tracking-wider">Cart</span>
           {tableSession.cart.items.length > 0 && (
-            <span className="absolute top-1 right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold border border-white text-[10px]">
+            <span className="absolute top-2 right-2 bg-brand-orange text-black w-6 h-6 flex items-center justify-center font-black border-2 border-black shadow-brutal-sm text-xs">
               {tableSession.cart.items.reduce((acc, i) => acc + (optimisticQuantities[`${i.menuItemId}-${JSON.stringify(i.modifications || [])}`] ?? i.quantity), 0)}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('orders')}
-          className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
-            activeTab === 'orders' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
+          className={`flex-1 flex flex-col items-center justify-center py-3 border-r-2 border-black ${
+            activeTab === 'orders' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
           }`}
         >
-          <span className="text-xl">🚚</span>
-          <span className="text-[10px]">Orders</span>
+          <span className="text-2xl mb-1">🚚</span>
+          <span className="text-[11px] font-black uppercase tracking-wider">Orders</span>
         </button>
         {!isHotel && (
           <button
@@ -1456,12 +1456,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               setActiveTab('billing');
               if (checkoutMode === 'IDLE') setCheckoutMode('CHOICE');
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-4 rounded-xl ${
-              activeTab === 'billing' ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-gray-400 font-medium'
+            className={`flex-1 flex flex-col items-center justify-center py-3 ${
+              activeTab === 'billing' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
             }`}
           >
-            <span className="text-xl">🧾</span>
-            <span className="text-[10px]">Checkout</span>
+            <span className="text-2xl mb-1">🧾</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">Pay</span>
           </button>
         )}
       </nav>
