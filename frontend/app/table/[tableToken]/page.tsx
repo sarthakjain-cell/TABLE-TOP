@@ -111,7 +111,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             if (matchedCategory) {
                setActiveCategory(matchedCategory);
                const btn = document.getElementById(`btn-category-${matchedCategory.replace(/\s+/g, '-')}`);
-               if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+               const container = document.getElementById('category-nav-container');
+               if (btn && container) {
+                 container.scrollTo({
+                   left: btn.offsetLeft - container.offsetWidth / 2 + btn.offsetWidth / 2,
+                   behavior: 'smooth'
+                 });
+               }
             }
           }
         });
@@ -584,7 +590,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         {activeTab === 'menu' && (
           <div className="pb-8">
             <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md py-3 mb-2 -mx-4 px-4 border-b border-gray-100 shadow-sm">
-              <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+              <div id="category-nav-container" className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 scroll-smooth">
                 {categories.map(c => (
                   <button 
                     key={c}
@@ -596,7 +602,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       scrollTimeout.current = setTimeout(() => { isScrollingRef.current = false; }, 800);
                       
                       if (c === 'All') {
-                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       } else {
                         document.getElementById(`category-${c.replace(/\s+/g, '-')}`)?.scrollIntoView({ behavior: 'smooth' });
                       }
