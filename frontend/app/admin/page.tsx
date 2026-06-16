@@ -1679,6 +1679,22 @@ export default function AdminPage() {
                     )}
                     {uploadError && <p className="text-sm text-red-500 mt-1">{uploadError}</p>}
                   </div>
+                  
+                  <div className="mb-4">
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition">
+                      <input 
+                        type="checkbox" 
+                        checked={editDishAllowsDietary} 
+                        onChange={(e) => setEditDishAllowsDietary(e.target.checked)} 
+                        className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" 
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-gray-800">Dietary Customization (⚙️)</span>
+                        <span className="text-gray-400 text-xs">Allows customers to request "No Onion", "No Garlic", etc.</span>
+                      </div>
+                    </label>
+                  </div>
+                  
                   <div className="flex gap-3 pt-2">
                     <button 
                       type="button" 
