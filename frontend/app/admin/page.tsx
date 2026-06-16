@@ -137,7 +137,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ₹{authToken}` 
+          'Authorization': `Bearer ${authToken}` 
         },
         body: JSON.stringify({
           restaurantId,
@@ -157,7 +157,7 @@ export default function AdminPage() {
       }));
       setNewTableNumber('');
     } catch (err: any) {
-      alert(`Failed to add table: ₹{err.message}`);
+      alert(`Failed to add table: ${err.message}`);
     } finally {
       setIsAddingTable(false);
     }
@@ -168,7 +168,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/close`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ₹{authToken}` }
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (!res.ok) {
          const data = await res.json();
@@ -183,7 +183,7 @@ export default function AdminPage() {
         return t;
       }));
     } catch (err: any) {
-      alert(`Failed to manually close session: ₹{err.message}`);
+      alert(`Failed to manually close session: ${err.message}`);
     }
   };
 
@@ -195,7 +195,7 @@ export default function AdminPage() {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ₹{authToken}` 
+          'Authorization': `Bearer ${authToken}` 
         },
         body: JSON.stringify({ status: 'NEW' })
       });
@@ -206,7 +206,7 @@ export default function AdminPage() {
       // Optimistically clear the requested state if needed
       setTables(prev => prev.map(t => ({ ...t, waiterRequested: false })));
     } catch (err: any) {
-      alert(`Failed to approve payment: ₹{err.message}`);
+      alert(`Failed to approve payment: ${err.message}`);
     }
   };
   const deleteTable = async (tableId: string) => {
@@ -214,7 +214,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/tables/${tableId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ₹{authToken}` }
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (!res.ok) {
          const data = await res.json();
@@ -222,7 +222,7 @@ export default function AdminPage() {
       }
       setTables(prev => prev.filter(t => t.id !== tableId));
     } catch (err: any) {
-      alert(`Failed to delete table: ₹{err.message}`);
+      alert(`Failed to delete table: ${err.message}`);
     }
   };
 
@@ -264,7 +264,7 @@ export default function AdminPage() {
       if (storedRestId && authToken) {
       const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ₹{authToken}`
+        'Authorization': `Bearer ${authToken}`
       };
 
       fetch(`/api/restaurants/${storedRestId}`, { headers })
@@ -319,7 +319,7 @@ export default function AdminPage() {
     const handleAdminSync = (data: any) => {
       let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
       if (storedRestId) {
-        const headers = { 'Authorization': `Bearer ₹{authToken}` };
+        const headers = { 'Authorization': `Bearer ${authToken}` };
         fetch(`/api/restaurants/${storedRestId}/tables`, { headers }).then(res => res.json()).then(data => {
           if(Array.isArray(data)) {
             const mapped = data.map((t: any) => ({ ...t, activeSession: t.sessions && t.sessions.length > 0 ? t.sessions[0] : undefined }));
@@ -355,7 +355,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/restaurants/${restaurantId}/mode`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ mode: newMode })
       });
       
@@ -373,7 +373,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ establishmentType, paymentMode, upiId, merchantName })
       });
       if (!res.ok) throw new Error('Failed to save settings');
@@ -422,7 +422,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ establishmentType: newType })
       });
       
@@ -438,7 +438,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ establishmentType, paymentMode, roomServiceFee: parseFloat(roomServiceFee), upiId, merchantName })
       });
       
@@ -463,14 +463,14 @@ export default function AdminPage() {
       const response = await fetch(uploadEndpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ₹{authToken}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Upload failed with status: ₹{response.status}`);
+        throw new Error(errorData.error || `Upload failed with status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -519,7 +519,7 @@ export default function AdminPage() {
         try {
           const res = await fetch(`/api/menu/${editingDish.id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
             body: JSON.stringify({ imageUrl: null })
           });
           if (res.ok) router.refresh();
@@ -541,7 +541,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/menu', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ 
           restaurantId, 
           name: newDishName, 
@@ -582,7 +582,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/menu/${editingDish.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ 
           name: editDishName, 
           price: Number(editDishPrice), 
@@ -614,7 +614,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/menu/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ₹{authToken}` }
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (res.ok) {
         setEditingDish(null);
@@ -624,7 +624,7 @@ export default function AdminPage() {
         router.refresh();
       } else {
         const errorData = await res.json();
-        alert(`Could not delete: ₹{errorData.error || 'Unknown error'}`);
+        alert(`Could not delete: ${errorData.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to delete dish', err);
@@ -652,7 +652,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/menu/${id}/availability`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ₹{authToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ isAvailable: !currentStatus })
       });
       if (!res.ok) {
@@ -771,7 +771,7 @@ export default function AdminPage() {
         <nav className="flex-1 px-4 py-6 space-y-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ₹{
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
@@ -779,7 +779,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => setActiveTab('menu')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ₹{
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'menu' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
@@ -787,7 +787,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => setActiveTab('ledger')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ₹{
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'ledger' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
@@ -795,7 +795,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ₹{
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'settings' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
@@ -825,15 +825,15 @@ export default function AdminPage() {
                className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
                onClick={toggleMode}
             >
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ₹{operationalMode === 'FULL_SERVICE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Waitstaff</span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ₹{operationalMode === 'SELF_SERVICE' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Self-Serve</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'FULL_SERVICE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Waitstaff</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'SELF_SERVICE' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Self-Serve</span>
             </button>
             <button 
                className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
                onClick={toggleEstablishmentType}
             >
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ₹{establishmentType === 'RESTAURANT' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Restaurant</span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ₹{establishmentType === 'HOTEL' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Hotel</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'RESTAURANT' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Restaurant</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'HOTEL' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Hotel</span>
             </button>
             {establishmentType === 'HOTEL' && (
               <div className="hidden sm:flex items-center gap-2 text-sm text-gray-700 font-semibold bg-gray-100 px-3 py-1.5 rounded border border-gray-200">
@@ -936,7 +936,7 @@ export default function AdminPage() {
                          order.items?.forEach((item: any) => {
                            const qty = item.quantity || item.orderedQuantity;
                            const name = item.menuItem?.name || item.name || 'Item';
-                           realItems.push(`${qty}x ₹{name}`);
+                           realItems.push(`${qty}x ${name}`);
                          });
                        }
                     });
@@ -964,7 +964,7 @@ export default function AdminPage() {
                   return (
                     <div
                       key={table.id}
-                      className={`relative bg-white rounded-lg border-2 flex flex-col p-4 shadow-sm transition-all duration-300 ₹{cardBorder} ₹{isWaiterRequested ? 'animate-pulse' : ''}`}
+                      className={`relative bg-white rounded-lg border-2 flex flex-col p-4 shadow-sm transition-all duration-300 ${cardBorder} ${isWaiterRequested ? 'animate-pulse' : ''}`}
                     >
                       {/* Waiter Badge (Micro-interaction) */}
                       {isWaiterRequested && (
@@ -977,11 +977,11 @@ export default function AdminPage() {
                       )}
 
                       <div className="flex justify-between items-start mb-4">
-                        <span className={`text-4xl font-bold tracking-tighter ₹{cardText}`}>
+                        <span className={`text-4xl font-bold tracking-tighter ${cardText}`}>
                           {table.number}
                         </span>
                         <div className="flex flex-col items-end gap-2">
-                           <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded border ₹{cardBorder} ₹{cardText} ₹{headerBg}`}>
+                           <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded border ${cardBorder} ${cardText} ${headerBg}`}>
                             {badge}
                           </span>
                           <div className="flex gap-1">
@@ -1014,7 +1014,7 @@ export default function AdminPage() {
                             </div>
                             <div className="flex items-end justify-between pt-2 border-t border-gray-100">
                               <span className="text-xs text-gray-500 font-medium">Time: <span className="text-gray-900">{realElapsed || '0 mins'}</span></span>
-                              <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">₹{realTotal || '0.00'}</span>
+                              <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">${realTotal || '0.00'}</span>
                             </div>
                             {table.activeSession && (
                               <button
@@ -1087,13 +1087,13 @@ export default function AdminPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                            ₹{Number(item.price).toFixed(2)}
+                            ${Number(item.price).toFixed(2)}
                             {item.hasHalfPortion && item.halfPrice && (
-                              <span className="block text-xs text-blue-600 mt-1">Half: ₹{Number(item.halfPrice).toFixed(2)}</span>
+                              <span className="block text-xs text-blue-600 mt-1">Half: ${Number(item.halfPrice).toFixed(2)}</span>
                             )}
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ₹{
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               item.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                             }`}>
                               {item.isAvailable ? 'Available' : 'Sold Out'}
@@ -1108,7 +1108,7 @@ export default function AdminPage() {
                             </button>
                             <button
                               onClick={() => toggleDishAvailability(item.id, item.isAvailable)}
-                              className={`text-xs font-semibold px-3 py-1.5 rounded transition-colors ₹{
+                              className={`text-xs font-semibold px-3 py-1.5 rounded transition-colors ${
                                 item.isAvailable ? 'text-red-600 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'
                               }`}
                             >
@@ -1201,7 +1201,7 @@ export default function AdminPage() {
                           className={`
                             relative flex flex-col items-center justify-center p-6 
                             border-2 border-dashed rounded-lg transition-colors cursor-pointer
-                            ₹{isUploadingImage 
+                            ${isUploadingImage 
                               ? 'border-blue-400 bg-blue-50' 
                               : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 bg-gray-50'
                             }
@@ -1241,7 +1241,7 @@ export default function AdminPage() {
                     <button 
                       type="submit" 
                       disabled={isSavingDish || isUploadingImage} 
-                      className={`font-semibold py-2 px-4 rounded-lg text-sm transition ₹{isSavingDish || isUploadingImage ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                      className={`font-semibold py-2 px-4 rounded-lg text-sm transition ${isSavingDish || isUploadingImage ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                     >
                       {isUploadingImage ? 'Uploading Image...' : isSavingDish ? 'Saving...' : 'Save Dish'}
                     </button>
@@ -1331,21 +1331,21 @@ export default function AdminPage() {
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
                           <TrendingUp size={18} /> <span className="font-semibold text-sm">{ledgerFilterDate || ledgerFilterMonth ? 'Filtered Sales' : 'Overall Sales'}</span>
                         </div>
-                        <div className="text-2xl font-black text-gray-900 tabular-nums">₹{overallSales.toFixed(2)}</div>
+                        <div className="text-2xl font-black text-gray-900 tabular-nums">${overallSales.toFixed(2)}</div>
                       </div>
 
                       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
                           <Calendar size={18} /> <span className="font-semibold text-sm">Today's Sales</span>
                         </div>
-                        <div className="text-2xl font-black text-gray-900 tabular-nums">₹{todaySales.toFixed(2)}</div>
+                        <div className="text-2xl font-black text-gray-900 tabular-nums">${todaySales.toFixed(2)}</div>
                       </div>
 
                       <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
                           <Receipt size={18} /> <span className="font-semibold text-sm">{ledgerFilterDate || ledgerFilterMonth ? 'Filtered Tax' : 'Tax Collected'}</span>
                         </div>
-                        <div className="text-2xl font-black text-gray-900 tabular-nums">₹{totalTaxCollected.toFixed(2)}</div>
+                        <div className="text-2xl font-black text-gray-900 tabular-nums">${totalTaxCollected.toFixed(2)}</div>
                       </div>
 
                       <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-xl border border-indigo-500 p-5 shadow-sm text-white relative overflow-hidden">
@@ -1355,7 +1355,7 @@ export default function AdminPage() {
                          <div className="flex items-center gap-3 mb-2 text-indigo-100 relative z-10">
                            <Building2 size={18} /> <span className="font-semibold text-sm">Indian GST Payable</span>
                          </div>
-                         <div className="text-3xl font-black tabular-nums tracking-tight mb-2 relative z-10">₹{gstPayable.toFixed(2)}</div>
+                         <div className="text-3xl font-black tabular-nums tracking-tight mb-2 relative z-10">${gstPayable.toFixed(2)}</div>
                          <div className="relative z-10 text-xs">
                            <span className="bg-indigo-900/50 border border-indigo-400 text-white rounded px-2 py-1 outline-none text-xs font-semibold">
                              {establishmentType === 'HOTEL' ? 'Hotel (18%)' : 'Restaurant (5%)'}
@@ -1382,8 +1382,8 @@ export default function AdminPage() {
                             <p className="text-xs text-gray-400">{tx.sessionId}</p>
                           </td>
                           <td className="px-6 py-4">
-                            <p className="text-sm font-bold text-gray-900 tabular-nums">₹{tx.amount}</p>
-                            <p className="text-xs text-gray-500">Tax: ₹{tx.taxPaid}</p>
+                            <p className="text-sm font-bold text-gray-900 tabular-nums">${tx.amount}</p>
+                            <p className="text-xs text-gray-500">Tax: ${tx.taxPaid}</p>
                           </td>
                           <td className="px-6 py-4">
                              <p className="text-sm font-medium text-gray-900">{tx.customerName || 'Anonymous'}</p>
@@ -1422,7 +1422,7 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Payment Collection Mode</label>
                     <div className="flex flex-col gap-3 mt-2">
-                      <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ₹{paymentMode === 'PRE_PAY' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${paymentMode === 'PRE_PAY' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                         <div className="flex items-center h-5">
                           <input
                             type="radio"
@@ -1438,7 +1438,7 @@ export default function AdminPage() {
                         </div>
                       </label>
 
-                      <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ₹{paymentMode === 'POST_PAY' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${paymentMode === 'POST_PAY' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                         <div className="flex items-center h-5">
                           <input
                             type="radio"
@@ -1633,7 +1633,7 @@ export default function AdminPage() {
                       </div>
                     ) : (
                       <div 
-                        className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors cursor-pointer ₹{isUploadingImage ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 bg-gray-50'}`}
+                        className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors cursor-pointer ${isUploadingImage ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 bg-gray-50'}`}
                         onDragOver={(e) => handleDragOver(e)}
                         onDrop={(e) => handleDrop(e, true)}
                         onClick={() => !isUploadingImage && editFileInputRef.current?.click()}
@@ -1667,7 +1667,7 @@ export default function AdminPage() {
                     <button type="button" onClick={() => setEditingDish(null)} className="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
                       Cancel
                     </button>
-                    <button type="submit" disabled={isUpdatingDish || isUploadingImage || isDeletingDish} className={`flex-1 font-semibold py-2 rounded-lg text-sm transition ₹{isUpdatingDish || isUploadingImage || isDeletingDish ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                    <button type="submit" disabled={isUpdatingDish || isUploadingImage || isDeletingDish} className={`flex-1 font-semibold py-2 rounded-lg text-sm transition ${isUpdatingDish || isUploadingImage || isDeletingDish ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                       {isUploadingImage ? 'Uploading...' : isUpdatingDish ? 'Saving...' : 'Save Changes'}
                     </button>
                   </div>

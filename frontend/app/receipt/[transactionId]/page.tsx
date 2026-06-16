@@ -164,7 +164,7 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
                     <div className="font-bold text-gray-800">{pi.orderItem.menuItem.name}</div>
                     <div className="text-xs text-gray-400 font-medium">Qty: {pi.quantityPaid}</div>
                   </div>
-                  <div className="font-bold text-gray-900">₹{pi.amount}</div>
+                  <div className="font-bold text-gray-900">${pi.amount}</div>
                 </div>
               ))}
             </div>
@@ -175,23 +175,23 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-gray-500 font-bold">
                 <span>Subtotal</span>
-                <span>₹{(transaction.amount - transaction.taxPaid - transaction.deliveryFeeApplied).toFixed(2)}</span>
+                <span>${(transaction.amount - transaction.taxPaid - transaction.deliveryFeeApplied).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-gray-500 font-bold">
                 <span>Tax</span>
-                <span>₹{transaction.taxPaid}</span>
+                <span>${transaction.taxPaid}</span>
               </div>
               {parseFloat(transaction.deliveryFeeApplied) > 0 && (
                 <div className="flex justify-between text-gray-500 font-bold">
                   <span>Room Service Fee</span>
-                  <span>₹{transaction.deliveryFeeApplied}</span>
+                  <span>${transaction.deliveryFeeApplied}</span>
                 </div>
               )}
             </div>
 
             <div className="flex justify-between items-center text-2xl font-black pt-6 border-t border-gray-900 mt-4">
               <span>TOTAL</span>
-              <span>₹{transaction.amount}</span>
+              <span>${transaction.amount}</span>
             </div>
           </div>
 

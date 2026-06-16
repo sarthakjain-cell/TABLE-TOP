@@ -61,7 +61,7 @@ export default function FinanceDashboard() {
       }
 
       const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ₹{authToken}` }
+        headers: { 'Authorization': `Bearer ${authToken}` }
       });
       
       if (res.ok) {
@@ -139,7 +139,7 @@ export default function FinanceDashboard() {
               <button
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id as any)}
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ₹{
+                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   activeFilter === filter.id 
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
                     : 'text-gray-500 hover:bg-gray-100'
@@ -158,7 +158,7 @@ export default function FinanceDashboard() {
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Total Rev</p>
-                <p className="text-3xl font-black text-emerald-600 tabular-nums">₹{metrics.totalRevenue}</p>
+                <p className="text-3xl font-black text-emerald-600 tabular-nums">${metrics.totalRevenue}</p>
               </div>
             </div>
 
@@ -168,7 +168,7 @@ export default function FinanceDashboard() {
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Cash</p>
-                <p className="text-3xl font-black text-amber-600 tabular-nums">₹{metrics.totalCash}</p>
+                <p className="text-3xl font-black text-amber-600 tabular-nums">${metrics.totalCash}</p>
               </div>
             </div>
 
@@ -178,7 +178,7 @@ export default function FinanceDashboard() {
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Online</p>
-                <p className="text-3xl font-black text-blue-600 tabular-nums">₹{metrics.totalOnline}</p>
+                <p className="text-3xl font-black text-blue-600 tabular-nums">${metrics.totalOnline}</p>
               </div>
             </div>
 
@@ -198,7 +198,7 @@ export default function FinanceDashboard() {
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Del. Profit</p>
-                <p className="text-3xl font-black text-purple-600 tabular-nums">₹{metrics.totalDeliveryFees}</p>
+                <p className="text-3xl font-black text-purple-600 tabular-nums">${metrics.totalDeliveryFees}</p>
               </div>
             </div>
           </div>
@@ -235,15 +235,15 @@ export default function FinanceDashboard() {
                         {tx.customerName || '-'}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ₹{tx.paymentMethod === 'CASH' ? 'bg-amber-50 text-amber-600 border-amber-200' : tx.paymentMethod === 'ONLINE' || tx.paymentMethod === 'UPI' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${tx.paymentMethod === 'CASH' ? 'bg-amber-50 text-amber-600 border-amber-200' : tx.paymentMethod === 'ONLINE' || tx.paymentMethod === 'UPI' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
                           {tx.paymentMethod === 'CASH' ? 'CASH' : tx.paymentMethod === 'ONLINE' || tx.paymentMethod === 'UPI' ? 'ONLINE' : 'UNKNOWN'}
                         </span>
                       </td>
                       <td className="px-6 py-4 font-black text-emerald-600">
-                        ₹{Number(tx.amount).toFixed(2)}
+                        ${Number(tx.amount).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 font-black text-purple-600">
-                        ₹{Number(tx.deliveryFeeApplied).toFixed(2)}
+                        ${Number(tx.deliveryFeeApplied).toFixed(2)}
                       </td>
                     </tr>
                   ))}

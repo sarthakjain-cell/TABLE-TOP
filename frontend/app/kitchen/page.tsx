@@ -471,7 +471,7 @@ export default function KitchenPage() {
                       {ticket.status === 'PAYMENT_PENDING' && (
                         <div className="space-y-2">
                           <div className="bg-indigo-900/40 border border-indigo-500/50 text-indigo-300 px-3 py-2 rounded-lg text-center font-bold text-sm uppercase tracking-widest animate-pulse">
-                            Verify: {ticket.paymentMethod === 'UPI' ? 'UPI' : 'CASH/CARD'} ₹{ticket.totalAmount || '0.00'}
+                            Verify: {ticket.paymentMethod === 'UPI' ? 'UPI' : 'CASH/CARD'} ${ticket.totalAmount || '0.00'}
                           </div>
                           <button 
                             onClick={() => updateOrderStatus(ticket.id, 'NEW')}
