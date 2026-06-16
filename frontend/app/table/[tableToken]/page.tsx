@@ -51,7 +51,6 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   // Optimistic UI state for cart quantities
   const [itemBeingCustomized, setItemBeingCustomized] = useState<MenuItem | null>(null);
   const [customMods, setCustomMods] = useState<string[]>([]);
-  const [customText, setCustomText] = useState('');
   const [isHalfPortionMod, setIsHalfPortionMod] = useState(false);
 
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
@@ -1302,21 +1301,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   );
                 })}
               </div>
-
-              <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">Special Instructions</p>
-              <textarea 
-                value={customText}
-                onChange={(e) => setCustomText(e.target.value)}
-                placeholder="E.g. No ice, severe peanut allergy..."
-                className="w-full border-2 border-gray-200 rounded-xl p-4 text-sm font-medium focus:outline-none focus:border-indigo-500 transition-colors resize-none h-24"
-              ></textarea>
             </div>
 
             <div className="mt-auto pt-4 border-t border-gray-100">
               <button
                 onClick={() => {
                   let finalMods = [...customMods];
-                  if (customText.trim()) finalMods.push(customText.trim());
                   if (isHalfPortionMod) finalMods.push('Half Portion');
                   handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods);
                   setItemBeingCustomized(null);
