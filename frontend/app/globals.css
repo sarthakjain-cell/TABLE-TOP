@@ -2,11 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tactile scale-up animation - REMOVED for brutalist feel */
-/* Brutalist click effect */
-.btn-brutal:active {
-  transform: translate(2px, 2px);
-  box-shadow: 0px 0px 0px rgba(0,0,0,1) !important;
+/* Tactile scale-up animation for buttons */
+.btn-tactile:active {
+  transform: scale(0.97);
+  transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom Scrollbar for smooth horizontal scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Glassmorphism helpers */
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Bottom Sheet Modal Overlay */
+.bottom-sheet-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 /* Print Styles for QR Code */

@@ -8,14 +8,30 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          orange: '#F97316',
-          dark: '#111827',
+          primary: '#E23744', // Zomato Red
+          secondary: '#FC8019', // Swiggy Orange
+          dark: '#1C1C1C',
         }
       },
       boxShadow: {
-        'brutal': '4px 4px 0px rgba(0,0,0,1)',
-        'brutal-sm': '2px 2px 0px rgba(0,0,0,1)',
-        'brutal-hover': '2px 2px 0px rgba(0,0,0,1)',
+        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+        'float': '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+        'up': '0 -4px 15px rgba(0,0,0,0.05)',
+      },
+      animation: {
+        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        'pop': 'pop 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+      keyframes: {
+        slideUp: {
+          '0%': { transform: 'translateY(100%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        pop: {
+          '0%': { transform: 'scale(0.95)' },
+          '50%': { transform: 'scale(1.02)' },
+          '100%': { transform: 'scale(1)' },
+        }
       }
     },
   },

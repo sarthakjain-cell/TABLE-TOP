@@ -490,22 +490,22 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative shadow-2xl pb-24">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       {/* 1. Contextual Mode Header */}
-      <header className="bg-white border-b-2 border-black sticky top-0 z-40 p-4">
+      <header className="glass border-b border-gray-100 sticky top-0 z-40 p-4 shadow-soft">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-black tracking-tight">{restaurant?.name || 'Table Top'}</h1>
-            <p className="text-sm text-gray-700 font-bold uppercase tracking-widest">{isHotel ? 'Room' : 'Table'}: {tableSession.tableNumber}</p>
+            <h1 className="text-2xl font-extrabold text-brand-dark tracking-tight">{restaurant?.name || 'Table Top'}</h1>
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-widest mt-1">{isHotel ? 'Room' : 'Table'} {tableSession.tableNumber}</p>
           </div>
           {tableSession.restaurantMode === 'FULL_SERVICE' ? (
             <button
               onClick={() => setShowBellModal(true)}
-              className="bg-brand-orange text-black border-2 border-black px-4 py-2 font-black uppercase text-xs shadow-brutal btn-brutal transition-transform flex items-center gap-2"
+              className="bg-brand-primary/10 text-brand-primary px-4 py-2 rounded-full text-xs font-bold btn-tactile flex items-center gap-2"
             >
               🔔 {isHotel ? 'Room Service' : 'Call Waiter'}
             </button>
           ) : (
-            <div className="bg-yellow-300 border-2 border-black text-black px-3 py-1 text-xs font-black uppercase shadow-brutal-sm">
-              Self-Service Mode
+            <div className="bg-brand-secondary/10 text-brand-secondary px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+              Self-Service
             </div>
           )}
         </div>
@@ -529,16 +529,16 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
         {activeTab === 'menu' && (
           <div className="pb-8">
-            <div className="sticky top-0 z-50 bg-white py-3 mb-4 -mx-4 px-4 border-b-2 border-black">
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md py-3 mb-2 -mx-4 px-4 border-b border-gray-100 shadow-sm">
+              <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
                 {categories.map(c => (
                   <button 
                     key={c}
                     onClick={() => setActiveCategory(c)}
-                    className={`whitespace-nowrap px-5 py-2 font-black uppercase text-xs border-2 border-black transition-all ${
+                    className={`whitespace-nowrap px-5 py-2 rounded-full text-[13px] font-bold transition-all btn-tactile ${
                       activeCategory === c 
-                        ? 'bg-black text-white shadow-brutal' 
-                        : 'bg-white text-black hover:bg-gray-100 shadow-brutal-sm'
+                        ? 'bg-brand-primary text-white shadow-md' 
+                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     {c}
@@ -1325,7 +1325,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                 : [...prev, opt.name]
                             );
                           }}
-                          className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all flex items-center gap-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                          className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center gap-2 btn-tactile ${isSelected ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
                         >
                           {opt.name}
                           {parseFloat(opt.price || 0) > 0 && <span className={`text-xs ${isSelected ? 'text-indigo-200' : 'text-gray-400'}`}>+${parseFloat(opt.price).toFixed(2)}</span>}
@@ -1416,54 +1416,77 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         </div>
       )}
 
+      {/* Floating View Cart Pill (Swiggy Style) */}
+      {activeTab === 'menu' && tableSession.cart.items.length > 0 && (
+        <div className="fixed bottom-[80px] left-0 right-0 max-w-md mx-auto px-4 z-40 animate-slide-up">
+          <button 
+            onClick={() => setActiveTab('cart')}
+            className="w-full bg-brand-primary text-white rounded-2xl p-4 shadow-float flex justify-between items-center btn-tactile"
+          >
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-extrabold uppercase tracking-wider">
+                {tableSession.cart.items.reduce((acc, i) => acc + (optimisticQuantities[`${i.menuItemId}-${JSON.stringify(i.modifications || [])}`] ?? i.quantity), 0)} Items Added
+              </span>
+              <span className="text-[11px] font-medium opacity-90">Extra charges may apply</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-extrabold">View Cart</span>
+              <span className="text-xl leading-none">›</span>
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* 5. Sticky Bottom Action Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t-4 border-black p-0 flex justify-around items-stretch z-40 shadow-[0_-4px_0_rgba(0,0,0,1)]">
-        <button
-          onClick={() => setActiveTab('menu')}
-          className={`flex-1 flex flex-col items-center justify-center py-3 border-r-2 border-black ${
-            activeTab === 'menu' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
-          }`}
-        >
-          <span className="text-2xl mb-1">📋</span>
-          <span className="text-[11px] font-black uppercase tracking-wider">Menu</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('cart')}
-          className={`flex-1 flex flex-col items-center justify-center py-3 border-r-2 border-black relative ${
-            activeTab === 'cart' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
-          }`}
-        >
-          <span className="text-2xl mb-1">🛒</span>
-          <span className="text-[11px] font-black uppercase tracking-wider">Cart</span>
-          {tableSession.cart.items.length > 0 && (
-            <span className="absolute top-2 right-2 bg-brand-orange text-black w-6 h-6 flex items-center justify-center font-black border-2 border-black shadow-brutal-sm text-xs">
-              {tableSession.cart.items.reduce((acc, i) => acc + (optimisticQuantities[`${i.menuItemId}-${JSON.stringify(i.modifications || [])}`] ?? i.quantity), 0)}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('orders')}
-          className={`flex-1 flex flex-col items-center justify-center py-3 border-r-2 border-black ${
-            activeTab === 'orders' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
-          }`}
-        >
-          <span className="text-2xl mb-1">🚚</span>
-          <span className="text-[11px] font-black uppercase tracking-wider">Orders</span>
-        </button>
-        {!isHotel && (
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass border-t border-gray-100 pb-safe z-40">
+        <div className="flex justify-around items-stretch p-2">
           <button
-            onClick={() => {
-              setActiveTab('billing');
-              if (checkoutMode === 'IDLE') setCheckoutMode('CHOICE');
-            }}
-            className={`flex-1 flex flex-col items-center justify-center py-3 ${
-              activeTab === 'billing' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
+            onClick={() => setActiveTab('menu')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all btn-tactile ${
+              activeTab === 'menu' ? 'text-brand-primary' : 'text-gray-400'
             }`}
           >
-            <span className="text-2xl mb-1">🧾</span>
-            <span className="text-[11px] font-black uppercase tracking-wider">Pay</span>
+            <span className={`text-2xl mb-1 ${activeTab === 'menu' ? 'animate-pop' : ''}`}>📋</span>
+            <span className={`text-[10px] font-bold ${activeTab === 'menu' ? 'text-brand-primary' : ''}`}>Menu</span>
           </button>
-        )}
+          <button
+            onClick={() => setActiveTab('cart')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl relative transition-all btn-tactile ${
+              activeTab === 'cart' ? 'text-brand-primary' : 'text-gray-400'
+            }`}
+          >
+            <span className={`text-2xl mb-1 ${activeTab === 'cart' ? 'animate-pop' : ''}`}>🛒</span>
+            <span className={`text-[10px] font-bold ${activeTab === 'cart' ? 'text-brand-primary' : ''}`}>Cart</span>
+            {tableSession.cart.items.length > 0 && (
+              <span className="absolute top-1 right-3 bg-brand-secondary text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold text-[9px] shadow-sm animate-pop">
+                {tableSession.cart.items.reduce((acc, i) => acc + (optimisticQuantities[`${i.menuItemId}-${JSON.stringify(i.modifications || [])}`] ?? i.quantity), 0)}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all btn-tactile ${
+              activeTab === 'orders' ? 'text-brand-primary' : 'text-gray-400'
+            }`}
+          >
+            <span className={`text-2xl mb-1 ${activeTab === 'orders' ? 'animate-pop' : ''}`}>🚚</span>
+            <span className={`text-[10px] font-bold ${activeTab === 'orders' ? 'text-brand-primary' : ''}`}>Orders</span>
+          </button>
+          {!isHotel && (
+            <button
+              onClick={() => {
+                setActiveTab('billing');
+                if (checkoutMode === 'IDLE') setCheckoutMode('CHOICE');
+              }}
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all btn-tactile ${
+                activeTab === 'billing' ? 'text-brand-primary' : 'text-gray-400'
+              }`}
+            >
+              <span className={`text-2xl mb-1 ${activeTab === 'billing' ? 'animate-pop' : ''}`}>🧾</span>
+              <span className={`text-[10px] font-bold ${activeTab === 'billing' ? 'text-brand-primary' : ''}`}>Pay</span>
+            </button>
+          )}
+        </div>
       </nav>
     </div>
   );
