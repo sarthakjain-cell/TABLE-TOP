@@ -447,15 +447,15 @@ export default function KitchenPage() {
                                    
                                    if (isCritical) {
                                      return (
-                                       <div key={mIdx} className="bg-rose-500/20 border-2 border-rose-500 text-rose-400 font-black text-sm tracking-widest uppercase flex items-center gap-2 p-2 mt-1 rounded-lg shadow-[0_0_15px_rgba(244,63,94,0.3)] w-fit">
-                                         <span className="animate-pulse">⚠️</span> {mod}
+                                       <div key={mIdx} className="bg-rose-500/30 border-[3px] border-rose-500 text-rose-400 font-black text-xl tracking-widest uppercase flex items-center gap-3 p-3 mt-2 rounded-xl shadow-[0_0_25px_rgba(244,63,94,0.5)] w-fit animate-pulse">
+                                         <span className="text-3xl">⚠️</span> {mod}
                                        </div>
                                      );
                                    }
 
                                    return (
-                                     <div key={mIdx} className="text-amber-400 font-bold text-sm tracking-wide flex items-center gap-2">
-                                       <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" /> {mod}
+                                     <div key={mIdx} className="text-amber-400 font-black text-lg tracking-wide flex items-center gap-3 mt-1">
+                                       <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" /> {mod}
                                      </div>
                                    );
                                  })}
