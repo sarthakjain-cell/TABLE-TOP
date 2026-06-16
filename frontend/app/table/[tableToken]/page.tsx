@@ -444,10 +444,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   });
                   if (!receiptRes.ok) {
                     const errTxt = await receiptRes.text();
-                    alert('Backend receipt error: ' + errTxt);
+                    toast.error('Failed to send WhatsApp receipt');
                   } else {
                     const resJson = await receiptRes.json();
-                    alert('Backend Response: ' + resJson.message);
+                    toast.success('WhatsApp Receipt Sent!');
                     addDebugLog('Receipt API returned OK: ' + resJson.message);
                   }
                 } catch (err: any) {

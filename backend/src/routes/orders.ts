@@ -228,6 +228,13 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
             where: { id: pendingTx.id },
             data: { status: 'COMPLETED' }
           });
+          
+          if (pendingTx.customerPhone) {
+             const { sendWhatsAppReceipt } = require('./receipts');
+             sendWhatsAppReceipt(pendingTx.id, pendingTx.customerPhone, fastify.log).catch((err: any) => {
+               fastify.log.error('Failed to auto-send WhatsApp for CASH payment', err);
+             });
+          }
         }
       }
 
