@@ -51,7 +51,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   // Optimistic UI state for cart quantities
   const [itemBeingCustomized, setItemBeingCustomized] = useState<MenuItem | null>(null);
   const [customMods, setCustomMods] = useState<string[]>([]);
-  const [selectedModifiers, setSelectedModifiers] = useState<Record<string, string[]>>({});
+  const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
   const [isHalfPortionMod, setIsHalfPortionMod] = useState(false);
 
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
@@ -763,7 +763,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                         setPaymentProcessing(false);
                         if (res?.success) {
                           if (tableSession.paymentMode === 'PRE_PAY') {
-                            setSelectedModifiers({});
+                            setSelectedModifiers([]);
                             setCheckoutMode('PAY_FULL');
                             setActiveTab('billing');
                           } else {
@@ -1287,59 +1287,53 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             
             <div className="overflow-y-auto custom-scrollbar pr-2 mb-4">
               {(() => {
-                let groups = [];
+                let mods = [];
                 try {
-                  groups = typeof itemBeingCustomized.modifierGroups === 'string' 
+                  const raw = typeof itemBeingCustomized.modifierGroups === 'string' 
                     ? JSON.parse(itemBeingCustomized.modifierGroups) 
                     : itemBeingCustomized.modifierGroups || [];
+                    
+                  // Handle both old nested group structure and new flat tag structure
+                  if (raw.length > 0 && raw[0].options !== undefined) {
+                    raw.forEach((g: any) => {
+                      g.options?.forEach((o: any) => {
+                        mods.push({ name: o.name, price: o.price });
+                      });
+                    });
+                  } else {
+                    mods = raw;
+                  }
                 } catch(e) {}
                 
-                if (groups.length === 0) {
+                if (mods.length === 0) {
                   return (
                     <div className="text-gray-500 italic text-center py-4">No custom options available.</div>
                   );
                 }
 
-                return groups.map((group: any, gIdx: number) => (
-                  <div key={gIdx} className="mb-6">
-                    <div className="flex justify-between items-end mb-3">
-                      <p className="text-sm font-bold text-gray-800 uppercase tracking-widest">{group.name}</p>
-                      <span className="text-xs font-semibold text-gray-400">
-                        {group.isRequired ? 'Required' : 'Optional'} 
-                        {group.max > 1 ? ` (Up to ${group.max})` : ''}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {group.options.map((opt: any) => {
-                        const isSelected = (selectedModifiers[group.name] || []).includes(opt.name);
-                        return (
-                          <button
-                            key={opt.name}
-                            onClick={() => {
-                              setSelectedModifiers(prev => {
-                                const current = prev[group.name] || [];
-                                if (isSelected) {
-                                  return { ...prev, [group.name]: current.filter(x => x !== opt.name) };
-                                } else {
-                                  if (group.max === 1) {
-                                    return { ...prev, [group.name]: [opt.name] };
-                                  } else if (current.length < group.max) {
-                                    return { ...prev, [group.name]: [...current, opt.name] };
-                                  }
-                                  return prev;
-                                }
-                              });
-                            }}
-                            className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all flex items-center gap-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'}`}
-                          >
-                            {opt.name}
-                            {opt.price > 0 && <span className={`text-xs ${isSelected ? 'text-indigo-200' : 'text-gray-400'}`}>+${opt.price}</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {mods.map((opt: any, idx: number) => {
+                      const isSelected = selectedModifiers.includes(opt.name);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSelectedModifiers(prev => 
+                              isSelected 
+                                ? prev.filter(x => x !== opt.name)
+                                : [...prev, opt.name]
+                            );
+                          }}
+                          className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all flex items-center gap-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                        >
+                          {opt.name}
+                          {parseFloat(opt.price || 0) > 0 && <span className={`text-xs ${isSelected ? 'text-indigo-200' : 'text-gray-400'}`}>+${parseFloat(opt.price).toFixed(2)}</span>}
+                        </button>
+                      );
+                    })}
                   </div>
-                ));
+                );
               })()}
             </div>
 
@@ -1374,9 +1368,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     onClick={() => {
                       let finalMods = [];
                       if (isHalfPortionMod) finalMods.push('Half Portion');
-                      Object.values(selectedModifiers).forEach(arr => {
-                        finalMods.push(...arr);
-                      });
+                      finalMods.push(...selectedModifiers);
                       handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods);
                       setItemBeingCustomized(null);
                     }}
@@ -1403,7 +1395,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 <button
                   key={req}
                   onClick={() => {
-                    setSelectedModifiers({});
+                    setSelectedModifiers([]);
                     requestHelp(req);
                     setShowBellModal(false);
                     alert(`Request sent: ${req}`);

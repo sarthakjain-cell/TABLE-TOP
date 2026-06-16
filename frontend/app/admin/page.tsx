@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { decimalMath } from '../../utils/decimalMath';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRouter } from 'next/navigation';
-import ModifierBuilder, { ModifierGroup } from './ModifierBuilder';
+import ModifierBuilder from './ModifierBuilder';
 import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
 
 interface OrderItem {
@@ -47,7 +47,7 @@ interface MenuItem {
   hasHalfPortion?: boolean;
   category?: string;
   isAvailable: boolean;
-  modifierGroups?: ModifierGroup[];
+  modifierGroups?: any;
   imageUrl?: string;
 }
 
@@ -93,7 +93,7 @@ export default function AdminPage() {
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
-  const [newDishModifierGroups, setNewDishModifierGroups] = useState<ModifierGroup[]>([]);
+  const [newDishModifierGroups, setNewDishModifierGroups] = useState<any[]>([]);
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export default function AdminPage() {
   const [editDishDesc, setEditDishDesc] = useState('');
   const [editDishCategory, setEditDishCategory] = useState('');
   const [editDishImageUrl, setEditDishImageUrl] = useState('');
-  const [editDishModifierGroups, setEditDishModifierGroups] = useState<ModifierGroup[]>([]);
+  const [editDishModifierGroups, setEditDishModifierGroups] = useState<any[]>([]);
   const [isUpdatingDish, setIsUpdatingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const editFileInputRef = React.useRef<HTMLInputElement>(null);
