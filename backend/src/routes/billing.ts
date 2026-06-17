@@ -290,7 +290,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           amount: totalGrand,
           taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
           status: 'PENDING',
-          paymentMethod: 'ONLINE',
+          paymentMethod: paymentMethod || 'ONLINE',
           razorpayOrderId: razorpayOrder.id,
           customerName,
           customerPhone,
@@ -309,6 +309,12 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
 
       // We do NOT mark Orders or Session as completed here. The webhook will handle it.
+
+      const io = getIO();
+      if (paymentMethod === 'CASH') {
+        io.emit('helpRequested', { tableNumber: session.table.number, requestType: 'Cash Payment' });
+      }
+      io.emit('adminStateSynced');
 
       return {
         transactionId: transaction.id,
