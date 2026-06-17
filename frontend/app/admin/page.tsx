@@ -373,9 +373,9 @@ export default function AdminPage() {
       let storedRestId = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') || '' : '';
       if (storedRestId) {
         const headers = { 'Authorization': `Bearer ${authToken}` };
-        fetch(`/api/restaurants/${storedRestId}/tables`, { headers }).then(res => res.json()).then(data => {
-          if(Array.isArray(data)) {
-            const mapped = data.map((t: any) => ({ ...t, activeSession: t.sessions && t.sessions.length > 0 ? t.sessions[0] : undefined }));
+        fetch(`/api/restaurants/${storedRestId}`, { headers }).then(res => res.json()).then(data => {
+          if(data && data.tables && Array.isArray(data.tables)) {
+            const mapped = data.tables.map((t: any) => ({ ...t, activeSession: t.sessions && t.sessions.length > 0 ? t.sessions[0] : undefined }));
             setTables(mapped.sort((a: any, b: any) => Number(a.number) - Number(b.number)));
           }
         });
