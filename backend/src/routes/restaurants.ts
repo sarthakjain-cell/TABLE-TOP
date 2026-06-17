@@ -22,6 +22,22 @@ interface UpdateSettingsBody {
 }
 
 export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  // Temporary route to create HOTEL01 in production DB
+  fastify.get('/api/create-hotel-account', async (request, reply) => {
+    try {
+      const bcrypt = require('bcrypt');
+      const hash = await bcrypt.hash('HOTEL01', 10);
+      const restaurant = await prisma.restaurant.upsert({
+        where: { id: 'HOTEL01' },
+        update: { passcodeHash: hash },
+        create: { id: 'HOTEL01', name: 'TableTop Hotel', passcodeHash: hash, taxRate: 0.12, operationalMode: 'FULL_SERVICE', establishmentType: 'HOTEL', paymentMode: 'POST_PAY' }
+      });
+      return reply.send({ success: true, message: 'Hotel account created successfully!', id: restaurant.id });
+    } catch(err: any) {
+      return reply.code(500).send({ error: err.message });
+    }
+  });
+
   // Create a new restaurant
   fastify.post<{ Body: RestaurantBody }>('/api/restaurants', async (request, reply) => {
     const { name, taxRate } = request.body;
