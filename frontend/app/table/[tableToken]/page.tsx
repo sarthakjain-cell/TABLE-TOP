@@ -178,7 +178,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         setActiveTab('billing');
       }
     }
-  }, [tableSession?.orders, tableSession?.transactions, waitingForWaiterApproval, waitingOrderIds, completedTransactionId]);
+  }, [tableSession?.orders, (tableSession as any)?.transactions, waitingForWaiterApproval, waitingOrderIds, completedTransactionId]);
 
   // Handle Android hardware back button gracefully to unclaim splits
   useEffect(() => {

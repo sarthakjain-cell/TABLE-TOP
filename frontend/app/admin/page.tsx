@@ -26,6 +26,7 @@ interface Session {
   id: string;
   status: 'ACTIVE' | 'CLOSED';
   orders: Order[];
+  transactions?: any[];
   createdAt: string; 
 }
 
