@@ -1013,7 +1013,7 @@ export default function AdminPage() {
                   
                   let realElapsed: string | null = null;
                   let realTotal: string | null = null;
-                  let realItems: string[] = [];
+                  let realItems: any[] = [];
                   let pendingPaymentOrderId: string | null = null;
                   let pendingTransactionId: string | null = null;
                   let hasPendingTransaction = false;

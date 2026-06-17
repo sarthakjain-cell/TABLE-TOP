@@ -80,7 +80,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
               sessions: {
                 where: { status: 'ACTIVE' },
                 include: {
-                  transactions: true,
+                  transactions: { include: { paymentItems: true } },
                   orders: {
                     include: {
                       items: {
