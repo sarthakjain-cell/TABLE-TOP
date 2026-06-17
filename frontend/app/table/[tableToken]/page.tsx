@@ -361,7 +361,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         const response = await fetch(`/api/sessions/${tableSession?.sessionId}/checkout-cart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customerName, customerPhone })
+          body: JSON.stringify({ customerName, customerPhone, paymentMethod })
         });
         if (!response.ok) {
           const errData = await response.json();
