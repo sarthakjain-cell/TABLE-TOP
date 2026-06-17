@@ -834,10 +834,70 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       </div>
                     </div>
                   ))}
-                  <div className="flex justify-between items-center pt-2 font-bold text-gray-800">
-                    <span>Subtotal:</span>
-                    <span>${tableSession.cart.subtotal}</span>
-                  </div>
+                  {(() => {
+                    let baseItemsTotal = 0;
+                    let customizationsTotal = 0;
+                    
+                    tableSession.cart.items.forEach((cartItem: any) => {
+                      const qty = optimisticQuantities[`${cartItem.menuItemId}-${JSON.stringify(cartItem.modifications || [])}`] ?? cartItem.quantity;
+                      let basePrice = 0;
+                      
+                      restaurant?.categories?.forEach((cat: any) => {
+                        cat.items?.forEach((mi: any) => {
+                          if (mi.id === cartItem.menuItemId) {
+                            basePrice = cartItem.modifications.includes('Half Portion') && mi.halfPrice 
+                              ? parseFloat(mi.halfPrice) 
+                              : parseFloat(mi.price);
+                          }
+                        });
+                      });
+                      
+                      if (basePrice === 0) basePrice = parseFloat(cartItem.price); // fallback
+                      
+                      const itemTotal = parseFloat(cartItem.price) * qty;
+                      const baseTotal = basePrice * qty;
+                      const modTotal = itemTotal - baseTotal;
+                      
+                      baseItemsTotal += baseTotal;
+                      customizationsTotal += (modTotal > 0.001 ? modTotal : 0);
+                    });
+
+                    const cartTotal = parseFloat(tableSession.cart.subtotal || '0');
+                    const taxes = cartTotal * parseFloat(restaurant?.taxRate || '0');
+                    const totalFees = isHotel ? roomServiceFee : 0;
+                    const finalTotal = cartTotal + taxes + totalFees;
+
+                    return (
+                      <div className="pt-4 mt-2 border-t border-gray-100 space-y-2.5 text-[13px]">
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Item Total</span>
+                          <span>${baseItemsTotal.toFixed(2)}</span>
+                        </div>
+                        {customizationsTotal > 0.001 && (
+                          <div className="flex justify-between items-center text-gray-500 font-semibold">
+                            <span>Customization Charges</span>
+                            <span>${customizationsTotal.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {totalFees > 0.001 && (
+                          <div className="flex justify-between items-center text-gray-500 font-semibold">
+                            <span>Room Service Fee</span>
+                            <span>${totalFees.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {taxes > 0.001 && (
+                          <div className="flex justify-between items-center text-gray-500 font-semibold">
+                            <span>Taxes (GST)</span>
+                            <span>${taxes.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-black text-gray-900 text-lg tracking-tight">
+                          <span>Grand Total</span>
+                          <span>${finalTotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {isHotel ? (
