@@ -1268,11 +1268,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   <div className="mt-6 flex flex-col gap-3">
                     <button
                       onClick={() => {
-                        const txId = (tableSession as any)?.transactions?.find((t: any) => t.status === 'COMPLETED')?.id;
+                        const txId = completedTransactionId || (tableSession as any)?.transactions?.find((t: any) => t.status === 'COMPLETED')?.id;
                         if (txId) {
                           window.location.href = `/receipt/${txId}`;
                         } else {
-                          alert('Transaction ID not found. Please ask waiter for bill.');
+                          alert('Receipt not ready yet. Please ask waiter for bill.');
                         }
                       }}
                       className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black px-6 py-4 rounded-xl transition active:scale-95 text-lg shadow-sm flex items-center justify-center gap-2"
