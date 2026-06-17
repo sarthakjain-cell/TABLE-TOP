@@ -133,7 +133,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         
         await tx.table.update({
           where: { id: session.tableId },
-          data: { status: 'VACANT', waiterRequested: false }
+          data: { status: 'VACANT' }
         });
       });
 
@@ -259,7 +259,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           });
           
           const io = getIO();
-          io.to(`restaurant:${session.restaurantId}`).emit('newOrderReceived');
+          io.to(`restaurant:${session.restaurantId}`).emit('newOrderReceived', { order: {} });
         }
       });
 
