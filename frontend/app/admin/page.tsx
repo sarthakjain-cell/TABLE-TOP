@@ -173,6 +173,24 @@ export default function AdminPage() {
       setIsAddingTable(false);
     }
   };
+  const handleAdminCollectCash = async (sessionId: string, tableId: string) => {
+    if (!confirm('Mark all unpaid items for this table as PAID in CASH? This will log a cash transaction and vacate the table.')) return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/admin-collect-cash`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (!res.ok) {
+         const data = await res.json();
+         throw new Error(data.error);
+      }
+      setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'VACANT', activeSession: undefined, waiterRequested: false } : t));
+      alert('Bill settled in Cash successfully');
+    } catch (err: any) {
+      alert(`Failed to settle bill: ${err.message}`);
+    }
+  };
+
   const handleForceCloseSession = async (sessionId: string, tableId: string) => {
     if (!confirm('Are you sure you want to mark this table as paid manually? This will clear the table, and the money will NOT be recorded in the digital ledger.')) return;
     
@@ -1166,12 +1184,20 @@ export default function AdminPage() {
                               <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">${realTotal || '0.00'}</span>
                             </div>
                             {table.activeSession && (
-                              <button
-                                onClick={() => handleForceCloseSession(table.activeSession!.id, table.id)}
-                                className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors border border-red-200"
-                              >
-                                Bill Paid Manually / Vacate
-                              </button>
+                              <div className="flex gap-2 w-full mt-2">
+                                <button
+                                  onClick={() => handleAdminCollectCash(table.activeSession!.id, table.id)}
+                                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm"
+                                >
+                                  Settle Bill in Cash
+                                </button>
+                                <button
+                                  onClick={() => handleForceCloseSession(table.activeSession!.id, table.id)}
+                                  className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors border border-red-200"
+                                >
+                                  Force Vacate
+                                </button>
+                              </div>
                             )}
                             {pendingPaymentOrderId && (
                               <button
