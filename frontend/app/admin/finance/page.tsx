@@ -15,6 +15,7 @@ export default function FinanceDashboard() {
   
   // Quick filters
   const [activeFilter, setActiveFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
+  const [methodFilter, setMethodFilter] = useState<'ALL' | 'CASH' | 'ONLINE'>('ALL');
 
   useEffect(() => {
     if (!authToken) {
@@ -128,26 +129,43 @@ export default function FinanceDashboard() {
 
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           
-          {/* Filters */}
-          <div className="flex items-center gap-2 mb-8 bg-white p-2 rounded-2xl shadow-sm border border-gray-200 inline-flex">
-            {[
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: 'week', label: 'This Week' },
-              { id: 'month', label: 'This Month' }
-            ].map(filter => (
-              <button
-                key={filter.id}
-                onClick={() => setActiveFilter(filter.id as any)}
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  activeFilter === filter.id 
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                    : 'text-gray-500 hover:bg-gray-100'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 overflow-x-auto pb-8 scrollbar-hide">
+            <button
+              onClick={() => setActiveFilter('today')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${activeFilter === 'today' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setActiveFilter('yesterday')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${activeFilter === 'yesterday' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Yesterday
+            </button>
+            <button
+              onClick={() => setActiveFilter('week')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${activeFilter === 'week' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              This Week
+            </button>
+            <button
+              onClick={() => setActiveFilter('month')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${activeFilter === 'month' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              This Month
+            </button>
+            
+            <div className="h-6 w-px bg-gray-300 mx-2"></div>
+            
+            <select
+              value={methodFilter}
+              onChange={(e) => setMethodFilter(e.target.value as any)}
+              className="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm outline-none focus:border-blue-500 font-semibold shadow-sm"
+            >
+              <option value="ALL">All Payments</option>
+              <option value="CASH">Cash Only</option>
+              <option value="ONLINE">Online Only</option>
+            </select>
           </div>
 
           {/* Metric Cards */}
@@ -223,8 +241,14 @@ export default function FinanceDashboard() {
                     <th className="px-6 py-4 border-b border-gray-200 text-right">Receipt</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
-                  {transactions.map((tx: any) => (
+                <tbody className="divide-y divide-gray-100">
+                  {transactions
+                    .filter(tx => {
+                      if (methodFilter === 'CASH') return tx.paymentMethod === 'CASH';
+                      if (methodFilter === 'ONLINE') return tx.paymentMethod !== 'CASH';
+                      return true;
+                    })
+                    .map((tx: any) => (
                     <tr key={tx.id} className="hover:bg-indigo-50/30 transition-colors">
                       <td className="px-6 py-4 font-semibold text-gray-600 whitespace-nowrap">
                         {formatDateTime(tx.createdAt)}
