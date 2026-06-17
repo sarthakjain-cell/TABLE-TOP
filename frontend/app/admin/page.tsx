@@ -83,6 +83,7 @@ export default function AdminPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [ledgerFilterDate, setLedgerFilterDate] = useState<string>('');
+  const [ledgerFilterMethod, setLedgerFilterMethod] = useState<'ALL' | 'CASH' | 'ONLINE'>('ALL');
   const [ledgerFilterMonth, setLedgerFilterMonth] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger' | 'settings'>('dashboard');
