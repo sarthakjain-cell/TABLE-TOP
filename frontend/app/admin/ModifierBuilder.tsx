@@ -4,7 +4,7 @@ import { Plus, Trash2, GripVertical } from 'lucide-react';
 
 export interface SimpleModifier {
   name: string;
-  price: number;
+  price: number | string;
 }
 
 interface ModifierBuilderProps {
@@ -83,8 +83,8 @@ export default function ModifierBuilder({ groups, onChange }: ModifierBuilderPro
                 <span className="absolute left-3 top-1.5 text-gray-500 text-sm">$</span>
                 <input
                   type="number" step="0.01" min="0"
-                  value={mod.price}
-                  onChange={(e) => updateModifier(idx, 'price', parseFloat(e.target.value) || 0)}
+                  value={mod.price === 0 ? '' : mod.price}
+                  onChange={(e) => updateModifier(idx, 'price', e.target.value)}
                   className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
                 />
               </div>
