@@ -62,6 +62,18 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     setOptimisticQuantities({});
   }, [tableSession?.cart?.items]);
 
+  const handleItemAddClick = (item: MenuItem, isHalf: boolean = false) => {
+    try {
+      const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups;
+      if (Array.isArray(g) && g.length > 0) {
+        setIsHalfPortionMod(isHalf);
+        setItemBeingCustomized(item);
+        return;
+      }
+    } catch {}
+    handleOptimisticAdd(item.id, 1, isHalf ? ['Half Portion'] : []);
+  };
+
   const handleOptimisticAdd = (menuItemId: string, quantity: number, modifications: string[] = []) => {
     const key = `${menuItemId}-${JSON.stringify(modifications)}`;
     
@@ -674,13 +686,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                     item.hasHalfPortion ? (
                                       <div className="flex gap-2">
                                         <button
-                                          onClick={() => handleOptimisticAdd(item.id, 1)}
+                                          onClick={() => handleItemAddClick(item, false)}
                                           className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile"
                                         >
                                           ADD FULL
                                         </button>
                                         <button
-                                          onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
+                                          onClick={() => handleItemAddClick(item, true)}
                                           className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile"
                                         >
                                           ADD HALF
@@ -694,7 +706,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                     ) : (
                                       <div className="flex flex-col items-start">
                                         <button
-                                          onClick={() => handleOptimisticAdd(item.id, 1)}
+                                          onClick={() => handleItemAddClick(item, false)}
                                           className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile"
                                         >
                                           ADD
@@ -729,13 +741,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                   item.hasHalfPortion ? (
                                     <div className="absolute -bottom-3 flex gap-1 justify-center w-full px-2">
                                       <button
-                                        onClick={() => handleOptimisticAdd(item.id, 1)}
+                                        onClick={() => handleItemAddClick(item, false)}
                                         className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center"
                                       >
                                         FULL
                                       </button>
                                       <button
-                                        onClick={() => handleOptimisticAdd(item.id, 1, ['Half Portion'])}
+                                        onClick={() => handleItemAddClick(item, true)}
                                         className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center"
                                       >
                                         HALF
@@ -744,7 +756,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                   ) : (
                                     <div className="absolute -bottom-4 w-full flex flex-col items-center">
                                       <button
-                                        onClick={() => handleOptimisticAdd(item.id, 1)}
+                                        onClick={() => handleItemAddClick(item, false)}
                                         className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100"
                                       >
                                         ADD
