@@ -889,20 +889,19 @@ export default function AdminPage() {
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-gray-800 tracking-tight">{restaurantName}</h2>
             <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
-            <button 
-               className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
-               onClick={toggleMode}
-            >
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'FULL_SERVICE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Waitstaff</span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'SELF_SERVICE' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Self-Serve</span>
-            </button>
-            <button 
-               className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
-               onClick={toggleEstablishmentType}
-            >
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'RESTAURANT' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Restaurant</span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'HOTEL' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Hotel</span>
-            </button>
+            {establishmentType === 'RESTAURANT' && (
+              <button 
+                 className="hidden sm:flex items-center gap-2 cursor-pointer select-none focus:outline-none bg-gray-100 p-1 rounded-full border border-gray-200"
+                 onClick={toggleMode}
+              >
+                <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'FULL_SERVICE' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Waitstaff</span>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${operationalMode === 'SELF_SERVICE' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Self-Serve</span>
+              </button>
+            )}
+            <div className="hidden sm:flex items-center gap-2 select-none bg-gray-100 p-1 rounded-full border border-gray-200 opacity-80">
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'RESTAURANT' ? 'bg-blue-600 text-white shadow-sm' : 'hidden'}`}>Restaurant</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${establishmentType === 'HOTEL' ? 'bg-purple-600 text-white shadow-sm' : 'hidden'}`}>Hotel</span>
+            </div>
             {establishmentType === 'HOTEL' && (
               <div className="hidden sm:flex items-center gap-2 text-sm text-gray-700 font-semibold bg-gray-100 px-3 py-1.5 rounded border border-gray-200">
                 <span>Fee: ₹</span>
