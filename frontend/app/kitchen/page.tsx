@@ -443,23 +443,7 @@ export default function KitchenPage() {
                            <div className="bg-rose-600 text-white font-black p-2 text-center uppercase tracking-widest animate-pulse mb-3 rounded shadow-[0_0_15px_rgba(225,29,72,0.6)]">
                              GUEST CLAIM: {ticket.guestClaim.name}, RM {ticket.guestClaim.room}
                            </div>
-                         )}
-                           {establishmentType === 'HOTEL' ? 'RM' : 'TBL'} {ticket.tableNumber} {ticket.totalPages > 1 && <span className="text-xl text-cyan-400 font-bold ml-2">({ticket.page}/{ticket.totalPages})</span>}
-                         </h3>
-                         <span className="inline-block mt-2 font-black text-cyan-400/70 tracking-[0.2em] text-xs bg-cyan-950/50 border border-cyan-900 px-2 py-1 rounded">
-                           ID:{ticket.id.slice(-6).toUpperCase()}
-                         </span>
-                       </div>
-                       <div className={`text-right ${isDelayed ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]' : 'text-slate-400'}`}>
-                         <div className={`text-3xl font-black tabular-nums leading-none ${isDelayed ? 'animate-bounce' : ''}`}>
-                           {elapsedMins}m
-                         </div>
-                         <div className="font-black text-xs tracking-[0.2em] mt-1 opacity-70">ELAPSED</div>
-                       </div>
-                    </div>
-
-                    {/* Ticket Body (Items) */}
-                    <div className="p-5 flex-1 space-y-4">
+                      )}
                       {ticket.items.map((item, idx) => (
                         <div key={idx} className="flex gap-4 items-start pb-4 border-b border-slate-800/50 last:border-0 last:pb-0">
                            <div className="bg-slate-800 text-cyan-400 font-black text-2xl px-3 py-1 rounded-lg border border-cyan-900/50 shrink-0 shadow-[0_0_10px_rgba(34,211,238,0.1)]">
