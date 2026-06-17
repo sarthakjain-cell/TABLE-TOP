@@ -407,12 +407,21 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
                 try {
                   const groups = typeof menuItem.modifierGroups === 'string' ? JSON.parse(menuItem.modifierGroups) : menuItem.modifierGroups;
                   if (Array.isArray(groups)) {
-                    for (const group of groups) {
-                      if (Array.isArray(group.options)) {
-                        for (const option of group.options) {
-                          if (modifications.includes(option.name) && option.price) {
-                            modifierPriceAdd += Number(option.price);
+                    if (groups.length > 0 && groups[0].options !== undefined) {
+                      for (const group of groups) {
+                        if (Array.isArray(group.options)) {
+                          for (const option of group.options) {
+                            if (modifications.includes(option.name) && option.price) {
+                              modifierPriceAdd += Number(option.price);
+                            }
                           }
+                        }
+                      }
+                    } else {
+                      // Flat array of modifier tags
+                      for (const mod of groups) {
+                        if (modifications.includes(mod.name) && mod.price) {
+                          modifierPriceAdd += Number(mod.price);
                         }
                       }
                     }
