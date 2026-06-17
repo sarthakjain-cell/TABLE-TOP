@@ -153,22 +153,32 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
   // Robust Waiter Approval listener that survives BFCache / tab switching
   useEffect(() => {
-    if (waitingForWaiterApproval && tableSession && waitingOrderIds.length > 0) {
-      // Check if ALL of the waiting orders have transitioned OUT of PAYMENT_PENDING
-      const areAllApproved = waitingOrderIds.every(orderId => {
-        const order = tableSession.orders.find(o => o.orderId === orderId);
-        return order && (order.status as string) !== 'PAYMENT_PENDING';
-      });
+    if (waitingForWaiterApproval && tableSession) {
+      let isApproved = false;
+      
+      if (waitingOrderIds.length > 0) {
+        // Check if ALL of the waiting orders have transitioned OUT of PAYMENT_PENDING
+        isApproved = waitingOrderIds.every(orderId => {
+          const order = tableSession.orders.find(o => o.orderId === orderId);
+          return order && (order.status as string) !== 'PAYMENT_PENDING';
+        });
+      } else if (completedTransactionId) {
+        // Wait for specific pending transaction to become COMPLETED
+        const tx = (tableSession as any).transactions?.find((t: any) => t.id === completedTransactionId);
+        if (tx && tx.status === 'COMPLETED') {
+          isApproved = true;
+        }
+      }
 
-      if (areAllApproved) {
-        // The waiter approved our specific PAYMENT_PENDING orders
+      if (isApproved) {
+        // The waiter approved our specific PAYMENT_PENDING orders or PENDING transaction
         setWaitingForWaiterApproval(false);
         setWaitingOrderIds([]);
         setCheckoutMode('SUCCESS');
         setActiveTab('billing');
       }
     }
-  }, [tableSession?.orders, waitingForWaiterApproval, waitingOrderIds]);
+  }, [tableSession?.orders, tableSession?.transactions, waitingForWaiterApproval, waitingOrderIds, completedTransactionId]);
 
   // Handle Android hardware back button gracefully to unclaim splits
   useEffect(() => {
@@ -411,7 +421,9 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               setCheckoutMode('SUCCESS');
             }
           } else {
-            setCheckoutMode('SUCCESS');
+            // POST_PAY Cash also goes to WAITING_WAITER to wait for admin verification of the transaction
+            setWaitingForWaiterApproval(true);
+            setCheckoutMode('WAITING_WAITER');
           }
           
           setPaymentProcessing(false);

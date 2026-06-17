@@ -226,6 +226,38 @@ export default function AdminPage() {
       alert(`Failed to approve payment: ${err.message}`);
     }
   };
+
+  const handleVerifyCashTransaction = async (transactionId: string) => {
+    if (!confirm('Are you sure you want to verify this cash payment?')) return;
+    
+    try {
+      const res = await fetch(`/api/transactions/${transactionId}/verify`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}` 
+        }
+      });
+      if (!res.ok) {
+         const data = await res.json();
+         throw new Error(data.error);
+      }
+      
+      // Optimistically update tables
+      setTables(prev => prev.map(t => {
+         const newT = { ...t, waiterRequested: false };
+         if (newT.activeSession && newT.activeSession.transactions) {
+           newT.activeSession.transactions = newT.activeSession.transactions.map((tx: any) => 
+              tx.id === transactionId ? { ...tx, status: 'COMPLETED' } : tx
+           );
+         }
+         return newT;
+      }));
+    } catch (err: any) {
+      alert(err.message || 'Failed to verify transaction');
+    }
+  };
+
   const deleteTable = async (tableId: string) => {
     if (!confirm('Are you sure you want to delete this table? This will permanently remove its QR code and history.')) return;
     try {
@@ -981,11 +1013,19 @@ export default function AdminPage() {
                   let realTotal: string | null = null;
                   let realItems: string[] = [];
                   let pendingPaymentOrderId: string | null = null;
+                  let pendingTransactionId: string | null = null;
+                  let hasPendingTransaction = false;
 
                   if (isOccupied && table.activeSession) {
                     const diffMs = Date.now() - new Date(table.activeSession.createdAt).getTime();
                     const diffMins = Math.floor(diffMs / 60000);
                     realElapsed = `${diffMins} mins`;
+                    
+                    const pendingTx = table.activeSession.transactions?.find((t: any) => t.status === 'PENDING');
+                    if (pendingTx) {
+                      hasPendingTransaction = true;
+                      pendingTransactionId = pendingTx.id;
+                    }
                     
                     let subtotal = '0.00';
                     table.activeSession.orders?.forEach((order: any) => {
@@ -1003,11 +1043,15 @@ export default function AdminPage() {
                     realTotal = decimalMath.add(subtotal, taxAmt);
                     
                     table.activeSession.orders?.forEach((order: any) => {
-                       if (order.status !== 'COMPLETED' && order.status !== 'CANCELLED') {
+                       if (order.status !== 'CANCELLED') {
                          order.items?.forEach((item: any) => {
                            const qty = item.quantity || item.orderedQuantity;
                            const name = item.menuItem?.name || item.name || 'Item';
-                           realItems.push(`${qty}x ${name}`);
+                           if (order.status === 'COMPLETED') {
+                             realItems.push(`✅ ${qty}x ${name}`);
+                           } else {
+                             realItems.push(`${qty}x ${name}`);
+                           }
                          });
                        }
                     });
@@ -1045,6 +1089,13 @@ export default function AdminPage() {
                         >
                           <Bell size={12} /> Clear Waiter
                         </button>
+                      )}
+                      
+                      {/* Payment Pending Badge */}
+                      {(hasPendingTransaction || pendingPaymentOrderId) && !isWaiterRequested && (
+                        <div className="absolute -top-3 -right-3 bg-orange-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md z-10 animate-pulse">
+                          Pending Payment
+                        </div>
                       )}
 
                       <div className="flex justify-between items-start mb-4">
@@ -1101,6 +1152,14 @@ export default function AdminPage() {
                                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm animate-pulse"
                               >
                                 Verify & Approve Payment
+                              </button>
+                            )}
+                            {pendingTransactionId && (
+                              <button
+                                onClick={() => handleVerifyCashTransaction(pendingTransactionId!)}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm animate-pulse"
+                              >
+                                Verify Cash Payment
                               </button>
                             )}
                           </div>
