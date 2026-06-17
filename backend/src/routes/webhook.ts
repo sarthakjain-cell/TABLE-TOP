@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { getIO } from '../socket';
 import { Decimal } from 'decimal.js';
 import crypto from 'crypto';
+import { sendWhatsAppReceipt } from '../utils/whatsapp';
 
 interface WebhookPayload {
   event: string;
@@ -51,7 +52,7 @@ export const webhookRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           include: {
             session: {
               include: {
-                table: true,
+                table: { include: { restaurant: true } },
                 orders: {
                   where: { status: { not: 'PENDING' } },
                   include: {
@@ -127,7 +128,10 @@ export const webhookRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           isFullyPaid,
           sessionId,
           tableId: transaction.session.tableId,
-          tableNumber: transaction.session.table.number
+          tableNumber: transaction.session.table.number,
+          customerPhone: transaction.customerPhone,
+          amount: transaction.amount.toString(),
+          restaurantName: transaction.session.table.restaurant.name
         };
       });
 
@@ -142,6 +146,16 @@ export const webhookRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           orderId: 'SESSION_COMPLETE',
           status: 'COMPLETED'
         });
+      }
+
+      // 6. Send automated WhatsApp Receipt if phone exists
+      if (result.customerPhone && !result.alreadyProcessed) {
+        sendWhatsAppReceipt(
+          result.customerPhone,
+          result.amount!,
+          result.restaurantName!,
+          transactionId
+        ).catch(err => fastify.log.error('WhatsApp Error:', err));
       }
 
       return reply.code(200).send({ received: true, processed: true, finalized: result.isFullyPaid });

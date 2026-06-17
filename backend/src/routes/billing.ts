@@ -4,6 +4,7 @@ import { Decimal } from 'decimal.js';
 import { getIO, getTableSessionSyncData } from '../socket';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { sendWhatsAppReceipt } from '../utils/whatsapp';
 
 interface SplitPaymentItem {
   orderItemId: string;
@@ -873,6 +874,16 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         io.emit('adminStateSynced');
       }); // end of $transaction
 
+      // Send automated WhatsApp Receipt if a phone number exists
+      if (transaction.customerPhone) {
+        sendWhatsAppReceipt(
+          transaction.customerPhone,
+          transaction.amount.toString(),
+          transaction.session.table.restaurant.name,
+          transaction.id
+        ).catch(err => request.server.log.error('WhatsApp Error:', err));
+      }
+
       return reply.code(200).send({ success: true });
     } catch (error) {
       request.server.log.error(error);
@@ -1027,6 +1038,16 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
               io.emit('adminStateSynced');
             }
           });
+          
+          // Send automated WhatsApp Receipt if a phone number exists
+          if (transaction.customerPhone) {
+            sendWhatsAppReceipt(
+              transaction.customerPhone,
+              transaction.amount.toString(),
+              transaction.session.table.restaurant.name,
+              transaction.id
+            ).catch(err => fastify.log.error('WhatsApp Error:', err));
+          }
         }
       }
 
