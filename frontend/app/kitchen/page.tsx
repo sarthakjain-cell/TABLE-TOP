@@ -406,14 +406,44 @@ export default function KitchenPage() {
                   <div key={ticket.virtualId} className={`bg-slate-900/80 backdrop-blur-md rounded-2xl border-2 ${borderColor} flex flex-col ${shadowColor} overflow-hidden transition-all`}>
                     
                     {/* Ticket Header */}
-                    <div className={`p-4 flex justify-between items-start border-b border-slate-800 ${isPaymentPending ? 'bg-indigo-500/10' : isPreparing ? 'bg-amber-400/5' : isDelayed ? 'bg-rose-500/5' : 'bg-cyan-500/5'}`}>
-                       <div className="flex-1">
-                         {establishmentType === 'HOTEL' && ticket.guestClaim && (
+                    <div className={`p-4 flex flex-col gap-2 border-b border-slate-800 ${isPaymentPending ? 'bg-indigo-500/10' : isPreparing ? 'bg-amber-400/5' : isDelayed ? 'bg-rose-500/5' : 'bg-cyan-500/5'}`}>
+                       {isPaymentPending && (
+                         <div className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse self-start mb-1 flex items-center gap-1 uppercase tracking-widest">
+                           <Clock size={12} /> Payment Not Done
+                         </div>
+                       )}
+                       <div className="flex justify-between items-start w-full">
+                         <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                               <h3 className={`text-2xl font-black tabular-nums tracking-tighter ${isPaymentPending ? 'text-indigo-400' : isPreparing ? 'text-amber-400' : isDelayed ? 'text-rose-500' : 'text-cyan-400'}`}>
+                                 {establishmentType === 'HOTEL' ? 'RM ' : 'TBL '}{ticket.tableNumber}
+                               </h3>
+                               <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                                 #{ticket.id.slice(-6).toUpperCase()}
+                               </span>
+                            </div>
+                            <div className="text-slate-400 text-sm font-medium flex items-center gap-2">
+                              <Clock size={14} className={isDelayed ? 'text-rose-500 animate-pulse' : ''} />
+                              <span className={isDelayed ? 'text-rose-400 font-bold' : ''}>
+                                {elapsedMins}m ago
+                              </span>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                           <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded border ${isPaymentPending ? 'border-indigo-500/50 text-indigo-400' : isPreparing ? 'border-amber-400/50 text-amber-400' : 'border-cyan-500/50 text-cyan-400'}`}>
+                             {isPaymentPending ? 'WAITING PAYMENT' : isPreparing ? 'PREPARING' : 'NEW'}
+                           </span>
+                         </div>
+                       </div>
+                    </div>
+
+                    {/* Ticket Body (Items) */}
+                    <div className="p-5 flex-1 space-y-4">
+                      {establishmentType === 'HOTEL' && ticket.guestClaim && (
                            <div className="bg-rose-600 text-white font-black p-2 text-center uppercase tracking-widest animate-pulse mb-3 rounded shadow-[0_0_15px_rgba(225,29,72,0.6)]">
                              GUEST CLAIM: {ticket.guestClaim.name}, RM {ticket.guestClaim.room}
                            </div>
                          )}
-                         <h3 className="text-3xl font-black tracking-tighter text-white leading-none drop-shadow-md">
                            {establishmentType === 'HOTEL' ? 'RM' : 'TBL'} {ticket.tableNumber} {ticket.totalPages > 1 && <span className="text-xl text-cyan-400 font-bold ml-2">({ticket.page}/{ticket.totalPages})</span>}
                          </h3>
                          <span className="inline-block mt-2 font-black text-cyan-400/70 tracking-[0.2em] text-xs bg-cyan-950/50 border border-cyan-900 px-2 py-1 rounded">

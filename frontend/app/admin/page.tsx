@@ -1033,7 +1033,7 @@ export default function AdminPage() {
                       if (order.status === 'PAYMENT_PENDING') {
                         pendingPaymentOrderId = order.id;
                       }
-                      if (order.status !== 'COMPLETED') {
+                      if (order.status !== 'CANCELLED') {
                         order.items?.forEach((item: any) => {
                           const itemTotal = decimalMath.multiply(item.price.toString(), item.quantity.toString());
                           subtotal = decimalMath.add(subtotal, itemTotal);
@@ -1156,12 +1156,18 @@ export default function AdminPage() {
                               </button>
                             )}
                             {pendingTransactionId && (
-                              <button
-                                onClick={() => handleVerifyCashTransaction(pendingTransactionId!)}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm animate-pulse"
-                              >
-                                Verify Cash Payment
-                              </button>
+                              <div className="flex items-center justify-between bg-green-50 rounded-lg p-3 border border-green-200 mt-2">
+                                <span className="text-xs font-bold text-green-800 flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                  Cash Payment Received?
+                                </span>
+                                <button
+                                  onClick={() => handleVerifyCashTransaction(pendingTransactionId!)}
+                                  className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-300 transition-colors hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                                >
+                                  <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         )}
