@@ -281,10 +281,13 @@ export default function AdminPage() {
       if (storedRestId && authToken) {
       const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `Bearer ${authToken}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       };
 
-      fetch(`/api/restaurants/${storedRestId}`, { headers })
+      fetch(`/api/restaurants/${storedRestId}?t=${Date.now()}`, { headers, cache: 'no-store' })
         .then(res => res.json())
         .then(async data => {
           if (!data.error) {
