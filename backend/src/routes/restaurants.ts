@@ -23,18 +23,6 @@ interface UpdateSettingsBody {
 
 export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Temporary route to create HOTEL01 in production DB
-  fastify.get('/api/fix-sarthakjain', async (request, reply) => {
-    try {
-      await prisma.restaurant.update({
-        where: { id: 'SARTHAKJAIN01' },
-        data: { establishmentType: 'RESTAURANT', operationalMode: 'FULL_SERVICE' }
-      });
-      return reply.send({ success: true, message: 'Fixed SARTHAKJAIN01 back to RESTAURANT' });
-    } catch (err: any) {
-      return reply.code(500).send({ error: err.message });
-    }
-  });
-
   fastify.get('/api/create-hotel-account', async (request, reply) => {
     try {
       const bcrypt = require('bcrypt');
