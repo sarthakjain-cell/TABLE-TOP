@@ -335,6 +335,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
       }
 
       try {
+        let restaurantId = '';
         await prisma.$transaction(async (tx) => {
           // Validate dining session status
           const session = await tx.session.findUnique({
@@ -343,6 +344,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
           if (!session || session.status === 'CLOSED') {
             throw new Error('Active dining session is invalid or closed.');
           }
+          restaurantId = session.restaurantId;
 
           // Validate item existence and availability
           const menuItem = await tx.menuItem.findUnique({
@@ -446,6 +448,11 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
         // Broadcast updated cart to the table room
         const updatedCart = await getAggregatedCart(sessionId);
         io?.to(`session:${sessionId}`).emit('cartUpdated', { sessionId, cart: updatedCart });
+        
+        // Broadcast to admin dashboard
+        if (restaurantId) {
+          io?.to(`restaurant:${restaurantId}`).emit('adminStateSynced');
+        }
 
         if (callback) callback({ success: true });
       } catch (err: any) {
