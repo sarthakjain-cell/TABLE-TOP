@@ -5,6 +5,7 @@ import { getIO, getTableSessionSyncData } from '../socket';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { sendWhatsAppReceipt } from '../utils/whatsapp';
+import { requireRole } from '../middleware/auth';
 
 interface SplitPaymentItem {
   orderItemId: string;
