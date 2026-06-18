@@ -695,7 +695,7 @@ export default function AdminPage() {
         setNewDishModifierGroups([]);
         setNewDishCategory('');
         setNewDishImageUrl('');
-        fetch(`/api/menu?restaurantId=${restaurantId}`)
+        fetch(`/api/menu?restaurantId=${restaurantId}&t=${Date.now()}`, { cache: 'no-store' })
           .then(r => r.json())
           .then(data => { if (!data.error) setMenuItems(data); });
         router.refresh();
@@ -730,7 +730,7 @@ export default function AdminPage() {
       
       if (res.ok) {
         setEditingDish(null);
-        fetch(`/api/menu?restaurantId=${restaurantId}`)
+        fetch(`/api/menu?restaurantId=${restaurantId}&t=${Date.now()}`, { cache: 'no-store' })
           .then(r => r.json())
           .then(data => { if (!data.error) setMenuItems(data); });
         router.refresh();
@@ -752,7 +752,7 @@ export default function AdminPage() {
       });
       if (res.ok) {
         setEditingDish(null);
-        fetch(`/api/menu?restaurantId=${restaurantId}`)
+        fetch(`/api/menu?restaurantId=${restaurantId}&t=${Date.now()}`, { cache: 'no-store' })
           .then(r => r.json())
           .then(data => { if (!data.error) setMenuItems(data); });
         router.refresh();
