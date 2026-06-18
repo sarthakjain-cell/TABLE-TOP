@@ -191,6 +191,7 @@ model RecommendationRule {
   confidence      Float    // Probability of the rule
   lift            Float    // Strength of the association
   restaurantId    String
+  timeContext     String   @default("ALL") // Context bucket: MORNING, AFTERNOON, EVENING, NIGHT, ALL
   createdAt       DateTime @default(now())
 
   // Relations
@@ -198,6 +199,6 @@ model RecommendationRule {
   consequent      MenuItem @relation("RuleConsequent", fields: [consequentId], references: [id], onDelete: Cascade)
   restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@index([antecedentId])
+  @@index([antecedentId, timeContext]) // Fast composite index for contextual queries
   @@index([restaurantId])
 }

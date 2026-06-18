@@ -8,17 +8,35 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
     const { restaurantId } = request.params as { restaurantId: string };
     
     try {
-      // Find all rules for this restaurant
+      // Determine current time context bucket based on server time
+      const hour = new Date().getHours();
+      let currentContext = 'ALL';
+      if (hour >= 5 && hour < 12) currentContext = 'MORNING';
+      else if (hour >= 12 && hour < 17) currentContext = 'AFTERNOON';
+      else if (hour >= 17 && hour < 22) currentContext = 'EVENING';
+      else currentContext = 'NIGHT';
+
+      // 1. Try fetching rules for the specific time context
       let rules = await prisma.recommendationRule.findMany({
-        where: { restaurantId },
+        where: { restaurantId, timeContext: currentContext },
         orderBy: [
           { lift: 'desc' },
           { confidence: 'desc' }
         ],
-        include: {
-          consequent: true // Include the recommended menu item details
-        }
+        include: { consequent: true }
       });
+
+      // 2. Anti-Sparsity Fallback: If no rules in this specific time bucket, fallback to 'ALL'
+      if (rules.length === 0 && currentContext !== 'ALL') {
+        rules = await prisma.recommendationRule.findMany({
+          where: { restaurantId, timeContext: 'ALL' },
+          orderBy: [
+            { lift: 'desc' },
+            { confidence: 'desc' }
+          ],
+          include: { consequent: true }
+        });
+      }
 
       // --- COLD START FALLBACK ---
       if (rules.length === 0) {
