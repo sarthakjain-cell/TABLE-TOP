@@ -15,6 +15,7 @@ import { financeRoutes } from './routes/finance';
 import { receiptRoutes } from './routes/receipts';
 import { seedRoutes } from './routes/seed';
 import uploadRoutes from './routes/upload';
+import { recommendationRoutes } from './routes/recommendations';
 import fastifyMultipart from '@fastify/multipart';
 
 const fastify = Fastify({
@@ -56,6 +57,7 @@ fastify.register(financeRoutes);
 fastify.register(seedRoutes);
 fastify.register(receiptRoutes);
 fastify.register(uploadRoutes);
+fastify.register(recommendationRoutes);
 
 // Health Check Endpoint
 fastify.get('/health', async () => {
