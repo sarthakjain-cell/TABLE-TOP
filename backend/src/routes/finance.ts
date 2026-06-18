@@ -16,9 +16,11 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         dateFilter.lte = new Date(endDate);
       }
 
-      // Fetch all completed transactions in date range
       const transactions = await prisma.transaction.findMany({
         where: {
+          session: {
+            restaurantId: request.user!.restaurantId
+          },
           status: 'COMPLETED',
           ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
         },
@@ -58,7 +60,7 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           customerName: tx.customerName,
           customerPhone: tx.customerPhone,
           paymentMethod: tx.paymentMethod || 'UNKNOWN',
-          roomOrTable: tx.session.table.number,
+          roomOrTable: tx.session?.table?.number || 'Takeaway / Unknown',
           createdAt: tx.createdAt,
           status: tx.status
         };
