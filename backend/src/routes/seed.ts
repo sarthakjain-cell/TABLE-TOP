@@ -130,10 +130,22 @@ export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       const itemIdsToDelete = itemsToDelete.map(item => item.id);
 
       if (itemIdsToDelete.length > 0) {
-        // Delete OrderItems associated with these menu items to prevent Foreign Key constraints (Restrict)
-        await prisma.orderItem.deleteMany({
-          where: { menuItemId: { in: itemIdsToDelete } }
+        // First delete OrderItemPayments because the database might not have the ON DELETE CASCADE constraint correctly applied
+        const orderItems = await prisma.orderItem.findMany({
+          where: { menuItemId: { in: itemIdsToDelete } },
+          select: { id: true }
         });
+        const orderItemIds = orderItems.map(oi => oi.id);
+
+        if (orderItemIds.length > 0) {
+          await prisma.orderItemPayment.deleteMany({
+            where: { orderItemId: { in: orderItemIds } }
+          });
+          
+          await prisma.orderItem.deleteMany({
+            where: { id: { in: orderItemIds } }
+          });
+        }
 
         // Now safely delete the redundant menu items
         await prisma.menuItem.deleteMany({
