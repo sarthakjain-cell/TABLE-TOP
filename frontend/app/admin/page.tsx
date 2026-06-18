@@ -1619,8 +1619,43 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'settings' && (
-            <div className="p-6 max-w-2xl mx-auto animate-fade-in space-y-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 max-w-2xl mx-auto animate-fade-in space-y-6">
+            <div className="bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-700">
+              <h2 className="text-xl font-bold text-white mb-4">ML Data Seeding (Temporary)</h2>
+              <p className="text-slate-400 mb-6">Click these buttons to inject the fake data into this exact database.</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => {
+                    const id = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null;
+                    if(id) {
+                      fetch(`/api/seed/menu?restaurantId=${id}`)
+                        .then(r => r.json())
+                        .then(d => alert(JSON.stringify(d)))
+                        .catch(e => alert(e));
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium"
+                >
+                  1. Seed 10 Dishes
+                </button>
+                <button 
+                  onClick={() => {
+                    const id = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null;
+                    if(id) {
+                      fetch(`/api/seed/orders?restaurantId=${id}`)
+                        .then(r => r.json())
+                        .then(d => alert(JSON.stringify(d)))
+                        .catch(e => alert(e));
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+                >
+                  2. Seed 50 Orders
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
                   <h2 className="text-lg font-bold text-gray-900">Payment Settings</h2>
                   <p className="text-sm text-gray-500 mt-1">Configure Direct UPI to avoid gateway fees.</p>
