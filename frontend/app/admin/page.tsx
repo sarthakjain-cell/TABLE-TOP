@@ -1626,13 +1626,13 @@ export default function AdminPage() {
               <div className="flex gap-4">
                 <button 
                   onClick={() => {
-                    const id = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null;
+                    const id = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') : null;
                     if(id) {
                       fetch(`/api/seed/menu?restaurantId=${id}`)
                         .then(r => r.json())
                         .then(d => alert(JSON.stringify(d)))
                         .catch(e => alert(e));
-                    }
+                    } else { alert("Error: No restaurant ID found in local storage."); }
                   }}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium"
                 >
@@ -1640,13 +1640,13 @@ export default function AdminPage() {
                 </button>
                 <button 
                   onClick={() => {
-                    const id = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null;
+                    const id = typeof window !== 'undefined' ? localStorage.getItem('tabletop_restaurant_id') : null;
                     if(id) {
                       fetch(`/api/seed/orders?restaurantId=${id}`)
                         .then(r => r.json())
                         .then(d => alert(JSON.stringify(d)))
                         .catch(e => alert(e));
-                    }
+                    } else { alert("Error: No restaurant ID found in local storage."); }
                   }}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
                 >
