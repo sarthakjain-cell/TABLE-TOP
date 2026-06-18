@@ -366,7 +366,7 @@ export default function AdminPage() {
         })
         .catch(err => console.error('Error fetching admin restaurant configs', err));
 
-      fetch(`/api/menu?restaurantId=${storedRestId}`, { headers })
+      fetch(`/api/menu?restaurantId=${storedRestId}&t=${Date.now()}`, { headers, cache: 'no-store' })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setMenuItems(data);
