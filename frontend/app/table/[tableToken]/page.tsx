@@ -105,6 +105,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [isVegOnly, setIsVegOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [visibleItemCount, setVisibleItemCount] = useState(10);
   const loaderRef = useRef<HTMLDivElement>(null);
   const imageCacheBuster = useRef(Date.now());
@@ -618,6 +619,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         {activeTab === 'menu' && (
           <div className="pb-8">
             <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md py-3 mb-2 -mx-4 px-4 border-b border-gray-100 shadow-sm">
+              <div className="mb-3 px-1">
+                <input
+                  type="text"
+                  placeholder="Search for a dish..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-gray-100 border-none rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-brand-primary/50 outline-none placeholder-gray-400"
+                />
+              </div>
               <div id="category-nav-container" className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 scroll-smooth">
                 {categories.map(c => (
                   <button 
@@ -666,7 +676,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
             <div className="flex flex-col pb-20 px-2 md:px-6">
               {categories.filter(c => c !== 'All').map(category => {
-                 const itemsInCategory = menuItems.filter(item => (item.category || 'Main Course') === category && (!isVegOnly || item.isVeg !== false));
+                 const itemsInCategory = menuItems.filter(item => 
+                   (item.category || 'Main Course') === category && 
+                   (!isVegOnly || item.isVeg !== false) &&
+                   (!searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                 );
                  if (itemsInCategory.length === 0) return null;
                  return (
                    <div key={category} id={`category-${category.replace(/\s+/g, '-')}`} className="scroll-mt-[130px] mb-8">

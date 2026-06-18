@@ -97,6 +97,7 @@ export default function AdminPage() {
   const [newDishHalfPrice, setNewDishHalfPrice] = useState('');
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
+  const [menuSearchQuery, setMenuSearchQuery] = useState('');
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
   const [newDishIsVeg, setNewDishIsVeg] = useState(true);
   const [newDishModifierGroups, setNewDishModifierGroups] = useState<any[]>([]);
@@ -1245,6 +1246,16 @@ export default function AdminPage() {
                   <p className="text-sm text-gray-500 mt-1">Manage dishes and real-time availability.</p>
                 </div>
                 
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search dishes by name..."
+                    value={menuSearchQuery}
+                    onChange={(e) => setMenuSearchQuery(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-400 shadow-sm"
+                  />
+                </div>
+                
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <table className="w-full text-left">
                     <thead>
@@ -1256,7 +1267,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {menuItems.map(item => (
+                      {menuItems.filter(item => !menuSearchQuery || item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).map(item => (
                         <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 flex items-center gap-4">
                             {item.imageUrl ? (
