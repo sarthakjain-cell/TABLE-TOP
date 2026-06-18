@@ -27,4 +27,33 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
     }
   });
 
+  // POST /api/admin/restaurants/:restaurantId/train-ml
+  fastify.post('/api/admin/restaurants/:restaurantId/train-ml', async (request, reply) => {
+    const { restaurantId } = request.params as { restaurantId: string };
+    
+    try {
+      // Trigger the Python ML worker over Railway's internal network bridge
+      // Fallback to localhost for local testing
+      const mlServiceUrl = process.env.NODE_ENV === 'production' 
+        ? 'http://ml-service.railway.internal:8000/train' 
+        : 'http://127.0.0.1:8000/train';
+        
+      const response = await fetch(`${mlServiceUrl}?restaurant_id=${restaurantId}`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("ML Worker Error:", errorText);
+        return reply.code(response.status).send({ error: 'Failed to trigger ML Worker', details: errorText });
+      }
+
+      const data = await response.json();
+      return reply.send({ success: true, message: 'AI Recommendation rules successfully recalculated.', data });
+    } catch (err: any) {
+      console.error("Error triggering ML training:", err);
+      return reply.code(500).send({ error: 'Could not connect to the ML Worker service. Make sure it is deployed and running.', details: err.message });
+    }
+  });
+
 };

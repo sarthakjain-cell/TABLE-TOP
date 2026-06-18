@@ -98,6 +98,7 @@ export default function AdminPage() {
   const [newDishDesc, setNewDishDesc] = useState('');
   const [newDishCategory, setNewDishCategory] = useState('');
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
+  const [isRecalculatingML, setIsRecalculatingML] = useState(false);
   const [newDishImageUrl, setNewDishImageUrl] = useState('');
   const [newDishIsVeg, setNewDishIsVeg] = useState(true);
   const [newDishModifierGroups, setNewDishModifierGroups] = useState<any[]>([]);
@@ -892,6 +893,23 @@ export default function AdminPage() {
     );
   }
 
+  const recalculateMLRules = async () => {
+    setIsRecalculatingML(true);
+    try {
+      const res = await fetch(`/api/admin/restaurants/${restaurantId}/train-ml`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✨ " + (data.message || "AI Recommendations successfully recalculated based on recent orders!"));
+      } else {
+        alert("⚠️ Failed to trigger AI training: " + (data.error || "Make sure the ML service is running."));
+      }
+    } catch (err) {
+      alert("⚠️ Error connecting to server.");
+    } finally {
+      setIsRecalculatingML(false);
+    }
+  };
+
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
@@ -1241,9 +1259,19 @@ export default function AdminPage() {
 
           {activeTab === 'menu' && (
             <div className="max-w-4xl mx-auto space-y-6">
-               <div>
-                  <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Menu Editor</h3>
-                  <p className="text-sm text-gray-500 mt-1">Manage dishes and real-time availability.</p>
+               <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Menu Editor</h3>
+                    <p className="text-sm text-gray-500 mt-1">Manage dishes and real-time availability.</p>
+                  </div>
+                  <button 
+                    onClick={recalculateMLRules}
+                    disabled={isRecalculatingML}
+                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-2 px-4 rounded-xl shadow-sm disabled:opacity-50 transition-all btn-tactile"
+                  >
+                    <span>✨</span>
+                    {isRecalculatingML ? 'Training AI...' : 'Recalculate AI Recommendations'}
+                  </button>
                 </div>
                 
                 <div className="mb-4">
