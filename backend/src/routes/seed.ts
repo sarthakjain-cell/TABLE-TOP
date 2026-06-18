@@ -99,22 +99,26 @@ export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       const { restaurantId } = request.query as { restaurantId: string };
       if (!restaurantId) return reply.code(400).send({ error: 'Missing restaurantId' });
 
-      const fakeDishes = [
-        { name: "Classic Beef Burger", price: 12.99, category: "Burgers", isVeg: false, restaurantId },
-        { name: "Chicken Tikka Masala", price: 15.50, category: "Main Course", isVeg: false, restaurantId },
-        { name: "Margherita Pizza", price: 11.00, category: "Pizza", isVeg: true, restaurantId },
-        { name: "Caesar Salad", price: 8.50, category: "Salads", isVeg: true, restaurantId },
-        { name: "French Fries", price: 4.99, category: "Sides", isVeg: true, restaurantId },
-        { name: "Chocolate Lava Cake", price: 7.50, category: "Desserts", isVeg: true, restaurantId },
-        { name: "Garlic Bread", price: 5.00, category: "Sides", isVeg: true, restaurantId },
-        { name: "Cola", price: 2.50, category: "Beverages", isVeg: true, restaurantId },
-        { name: "Mango Lassi", price: 4.00, category: "Beverages", isVeg: true, restaurantId },
-        { name: "Paneer Butter Masala", price: 14.00, category: "Main Course", isVeg: true, restaurantId }
-      ];
+      const adjectives = ['Spicy', 'Crispy', 'Smoky', 'Sweet', 'Tangy', 'Savory', 'Zesty', 'Classic', 'Royal', 'Ultimate', 'Fresh', 'Roasted', 'Grilled', 'Vegan', 'Chef Special', 'Homestyle', 'Premium', 'Signature', 'Spiced', 'Buttery'];
+      const nouns = ['Burger', 'Pizza', 'Pasta', 'Salad', 'Wrap', 'Taco', 'Curry', 'Noodles', 'Sandwich', 'Bowl'];
+      const categories = ['Main Course', 'Appetizers', 'Desserts', 'Beverages'];
+
+      const fakeDishes = [];
+      for (let i = 0; i < adjectives.length; i++) {
+        for (let j = 0; j < nouns.length; j++) {
+          fakeDishes.push({
+            name: `${adjectives[i]} ${nouns[j]}`,
+            price: Number((Math.random() * 20 + 5).toFixed(2)),
+            category: categories[Math.floor(Math.random() * categories.length)],
+            isVeg: Math.random() > 0.5,
+            restaurantId
+          });
+        }
+      }
 
       await prisma.menuItem.createMany({ data: fakeDishes });
 
-      return reply.send({ success: true, message: `Seeded 10 fake dishes for ${restaurantId}` });
+      return reply.send({ success: true, message: `Seeded ${fakeDishes.length} fake dishes for ${restaurantId}` });
     } catch (err: any) {
       console.error(err);
       return reply.code(500).send({ error: err.message });
