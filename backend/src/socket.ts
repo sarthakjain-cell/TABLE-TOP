@@ -211,7 +211,8 @@ export async function getTableSessionSyncData(sessionId: string) {
         orderedQuantity: qty.toNumber(),
         paidQuantity: paidQty.toNumber(),
         unpaidQuantity: unpaidQty.toNumber(),
-        modifications: item.modifications
+        modifications: item.modifications,
+        isServed: item.isServed
       };
     });
 

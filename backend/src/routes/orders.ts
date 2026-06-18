@@ -159,7 +159,8 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
           id: item.id,
           name: item.menuItem.name,
           quantity: new Decimal(item.quantity.toString()).toNumber(),
-          modifications: item.modifications
+          modifications: item.modifications,
+          isServed: item.isServed
         })),
         guestClaim: order.session.transactions.length > 0 && (order.session.transactions[0].customerName || order.session.transactions[0].customerPhone) ? {
           name: order.session.transactions[0].customerName || '',
@@ -272,6 +273,27 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to update order status' });
+    }
+  });
+
+  // Toggle individual dish delivery status
+  fastify.patch<{ Params: { id: string }; Body: { isServed: boolean } }>('/api/order-items/:id/served', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
+    const { id } = request.params;
+    const { isServed } = request.body;
+
+    if (typeof isServed !== 'boolean') {
+      return reply.code(400).send({ error: 'isServed boolean is required' });
+    }
+
+    try {
+      const updatedItem = await prisma.orderItem.update({
+        where: { id },
+        data: { isServed }
+      });
+      return updatedItem;
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to update item served status' });
     }
   });
 };
