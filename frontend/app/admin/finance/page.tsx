@@ -14,8 +14,9 @@ export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true);
   
   // Quick filters
-  const [activeFilter, setActiveFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
+  const [activeFilter, setActiveFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all' | 'custom'>('today');
   const [methodFilter, setMethodFilter] = useState<'ALL' | 'CASH' | 'ONLINE'>('ALL');
+  const [customDate, setCustomDate] = useState('');
 
   useEffect(() => {
     if (!authToken) {
@@ -23,10 +24,10 @@ export default function FinanceDashboard() {
       return;
     }
     
-    fetchData(activeFilter);
-  }, [activeFilter, authToken]);
+    fetchData(activeFilter, customDate);
+  }, [activeFilter, customDate, authToken]);
 
-  const fetchData = async (filter: string) => {
+  const fetchData = async (filter: string, dateStr?: string) => {
     setLoading(true);
     try {
       const now = new Date();
@@ -35,7 +36,11 @@ export default function FinanceDashboard() {
       
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       
-      if (filter === 'today') {
+      if (filter === 'custom' && dateStr) {
+        const d = new Date(dateStr);
+        startDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+        endDate = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString();
+      } else if (filter === 'today') {
         startDate = startOfDay.toISOString();
       } else if (filter === 'yesterday') {
         const yesterday = new Date(startOfDay);
@@ -154,6 +159,27 @@ export default function FinanceDashboard() {
             >
               This Month
             </button>
+            <button
+              onClick={() => setActiveFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${activeFilter === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              All Time
+            </button>
+            
+            <div className="h-6 w-px bg-gray-300 mx-2"></div>
+
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+              <Calendar size={16} className="text-gray-400" />
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => {
+                  setCustomDate(e.target.value);
+                  if (e.target.value) setActiveFilter('custom');
+                }}
+                className="text-sm font-semibold text-gray-700 outline-none bg-transparent"
+              />
+            </div>
             
             <div className="h-6 w-px bg-gray-300 mx-2"></div>
             
