@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const RESTAURANT_ID = '432f3304-7c0e-42d0-9132-e8c2f3ea8756';
+const RESTAURANT_ID = 'HOTEL01';
 
 const firstNames = ['John', 'Emma', 'Aarav', 'Priya', 'Michael', 'Sarah', 'Rohan', 'Neha', 'David', 'Lisa', 'Amit', 'Kavita', 'James', 'Emily', 'Vikram', 'Anjali'];
 const lastNames = ['Smith', 'Johnson', 'Sharma', 'Patel', 'Williams', 'Brown', 'Singh', 'Gupta', 'Jones', 'Garcia', 'Kumar', 'Joshi', 'Miller', 'Davis', 'Reddy', 'Das'];

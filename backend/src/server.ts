@@ -13,6 +13,7 @@ import { webhookRoutes } from './routes/webhook';
 import { authRoutes } from './routes/auth';
 import { financeRoutes } from './routes/finance';
 import { receiptRoutes } from './routes/receipts';
+import { seedRoutes } from './routes/seed';
 import uploadRoutes from './routes/upload';
 import fastifyMultipart from '@fastify/multipart';
 
@@ -52,6 +53,7 @@ fastify.register(billingRoutes);
 fastify.register(webhookRoutes);
 fastify.register(authRoutes);
 fastify.register(financeRoutes);
+fastify.register(seedRoutes);
 fastify.register(receiptRoutes);
 fastify.register(uploadRoutes);
 
