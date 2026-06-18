@@ -176,11 +176,65 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         }
       });
 
-      if (!transaction) return reply.code(404).send({ error: 'Transaction not found' });
-      return transaction;
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.code(500).send({ error: 'Failed to fetch transaction' });
+      if (transaction) return transaction;
+
+      // Fallback: Check if the ID is an Order ID (for Pre-Payment Bills)
+      const order = await prisma.order.findUnique({
+        where: { id: request.params.id },
+        include: {
+          session: {
+            include: {
+              table: {
+                include: { restaurant: true }
+              }
+            }
+          },
+          items: {
+            include: { menuItem: true }
+          }
+        }
+      });
+
+      if (!order) return reply.code(404).send({ error: 'Transaction or Order not found' });
+
+      // Mock a Transaction payload for the frontend receipt page
+      const taxRate = new Decimal(order.session.table.restaurant.taxRate.toString());
+      let totalAmount = new Decimal(0);
+      let totalTax = new Decimal(0);
+      
+      const paymentItems = order.items.map(item => {
+        const qty = new Decimal(item.quantity.toString());
+        const subtotal = new Decimal(item.price.toString()).mul(qty);
+        const tax = subtotal.mul(taxRate).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+        
+        totalAmount = totalAmount.add(subtotal);
+        totalTax = totalTax.add(tax);
+        
+        return {
+          id: `mock-${item.id}`,
+          quantityPaid: qty.toString(),
+          amount: subtotal.toString(),
+          taxFraction: tax.toString(),
+          orderItem: item
+        };
+      });
+
+      const grandTotal = totalAmount.add(totalTax).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+      return {
+        id: order.id,
+        status: 'PRE_PAYMENT_BILL',
+        amount: grandTotal.toString(),
+        taxPaid: totalTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toString(),
+        deliveryFeeApplied: "0.00",
+        customerPhone: null,
+        createdAt: order.createdAt,
+        session: order.session,
+        paymentItems: paymentItems
+      };
+    } catch (error: any) {
+      request.log.error(error);
+      return reply.code(500).send({ error: error.message || 'Failed to fetch transaction' });
     }
   });
 

@@ -165,78 +165,113 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
         
         <div id="receipt-container" className="bg-white max-w-md w-full shadow-2xl rounded-sm overflow-hidden relative border-t-8 border-indigo-600 animate-scale-up">
           {/* Receipt Header */}
-          <div className="p-8 text-center border-b border-dashed border-gray-300 bg-white">
+          <div className="p-8 text-center border-b border-gray-200 bg-white relative">
+            {transaction.status === 'PRE_PAYMENT_BILL' && (
+              <div className="absolute top-4 right-4 bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">
+                Unpaid Bill
+              </div>
+            )}
+            <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md">
+              <span className="text-2xl font-black">{transaction.session.table.restaurant.name.charAt(0)}</span>
+            </div>
             <h1 className="text-2xl font-black tracking-tight text-gray-900 mb-1 uppercase">
               {transaction.session.table.restaurant.name}
             </h1>
             <p className="text-gray-500 text-sm font-bold">Table #{transaction.session.table.number}</p>
-            <div className="mt-6 inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-1.5 rounded-full text-xs font-black tracking-widest">
-              ✓ PAID IN FULL
+            
+            {transaction.status === 'COMPLETED' ? (
+              <div className="mt-4 inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-1.5 rounded-full text-xs font-black tracking-widest">
+                ✓ PAID IN FULL
+              </div>
+            ) : (
+              <div className="mt-4 inline-flex items-center justify-center bg-orange-50 text-orange-700 border border-orange-200 px-4 py-1.5 rounded-full text-xs font-black tracking-widest">
+                PLEASE PAY WAITER
+              </div>
+            )}
+          </div>
+
+          {/* Receipt Meta Details */}
+          <div className="px-8 py-6 space-y-3 bg-slate-50 border-b border-gray-200">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500 font-semibold">Date & Time</span>
+              <span className="text-gray-900 font-bold">{new Date(transaction.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500 font-semibold">{transaction.status === 'PRE_PAYMENT_BILL' ? 'Order ID' : 'Receipt No.'}</span>
+              <span className="text-gray-900 font-mono font-bold">{transaction.id.split('-')[0].toUpperCase()}</span>
+            </div>
+            {transaction.customerPhone && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500 font-semibold">Customer</span>
+                <span className="text-gray-900 font-mono font-bold">{transaction.customerPhone}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500 font-semibold">Payment Method</span>
+              <span className="text-gray-900 font-bold">{transaction.status === 'COMPLETED' ? 'Digital/Card' : 'Pending Cash'}</span>
             </div>
           </div>
 
-          {/* Receipt Details */}
-          <div className="p-8 space-y-6 bg-white">
-            <div className="flex justify-between text-xs text-gray-500 uppercase tracking-wider font-bold">
-              <span>Date</span>
-              <span>{new Date(transaction.createdAt).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 uppercase tracking-wider font-bold">
-              <span>Trx ID</span>
-              <span className="font-mono">{transaction.id.split('-')[0]}</span>
-            </div>
-            {transaction.customerPhone && (
-              <div className="flex justify-between text-xs text-gray-500 uppercase tracking-wider font-bold">
-                <span>Customer Phone</span>
-                <span className="font-mono">{transaction.customerPhone}</span>
-              </div>
-            )}
+          {/* Items Breakdown Table */}
+          <div className="p-8 bg-white">
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Order Details</h3>
+            
+            <table className="w-full text-sm mb-6">
+              <thead>
+                <tr className="border-b-2 border-gray-100 text-gray-400 uppercase text-[10px] tracking-widest font-black text-left">
+                  <th className="pb-3 w-1/2">Item</th>
+                  <th className="pb-3 text-center">Qty</th>
+                  <th className="pb-3 text-right">Price</th>
+                  <th className="pb-3 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {transaction.paymentItems.map((pi: any) => (
+                  <tr key={pi.id}>
+                    <td className="py-4 pr-2">
+                      <div className="font-bold text-gray-900">{pi.orderItem.menuItem.name}</div>
+                      {pi.orderItem.modifications && pi.orderItem.modifications.length > 0 && (
+                        <div className="text-[11px] text-gray-400 font-medium mt-1">
+                          {pi.orderItem.modifications.join(', ')}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-4 text-center font-semibold text-gray-700">{pi.quantityPaid}</td>
+                    <td className="py-4 text-right font-semibold text-gray-500">${parseFloat(pi.orderItem.price).toFixed(2)}</td>
+                    <td className="py-4 text-right font-bold text-gray-900">${parseFloat(pi.amount).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-            <hr className="border-dashed border-gray-300" />
-
-            {/* Items */}
-            <div className="space-y-4">
-              {transaction.paymentItems.map((pi: any) => (
-                <div key={pi.id} className="flex justify-between text-sm items-start">
-                  <div>
-                    <div className="font-bold text-gray-800">{pi.orderItem.menuItem.name}</div>
-                    <div className="text-xs text-gray-400 font-medium">Qty: {pi.quantityPaid}</div>
-                  </div>
-                  <div className="font-bold text-gray-900">${pi.amount}</div>
-                </div>
-              ))}
-            </div>
-
-            <hr className="border-dashed border-gray-300" />
-
-            {/* Totals */}
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-gray-500 font-bold">
+            {/* Totals Section */}
+            <div className="bg-slate-50 rounded-2xl p-5 space-y-3 border border-gray-100">
+              <div className="flex justify-between text-sm text-gray-500 font-bold">
                 <span>Subtotal</span>
-                <span>${(transaction.amount - transaction.taxPaid - transaction.deliveryFeeApplied).toFixed(2)}</span>
+                <span>${(parseFloat(transaction.amount) - parseFloat(transaction.taxPaid) - parseFloat(transaction.deliveryFeeApplied)).toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-gray-500 font-bold">
-                <span>Tax</span>
-                <span>${transaction.taxPaid}</span>
+              <div className="flex justify-between text-sm text-gray-500 font-bold">
+                <span>Tax ({transaction.session.table.restaurant.taxRate}%)</span>
+                <span>${parseFloat(transaction.taxPaid).toFixed(2)}</span>
               </div>
               {parseFloat(transaction.deliveryFeeApplied) > 0 && (
-                <div className="flex justify-between text-gray-500 font-bold">
+                <div className="flex justify-between text-sm text-gray-500 font-bold">
                   <span>Room Service Fee</span>
-                  <span>${transaction.deliveryFeeApplied}</span>
+                  <span>${parseFloat(transaction.deliveryFeeApplied).toFixed(2)}</span>
                 </div>
               )}
-            </div>
-
-            <div className="flex justify-between items-center text-2xl font-black pt-6 border-t border-gray-900 mt-4">
-              <span>TOTAL</span>
-              <span>${transaction.amount}</span>
+              
+              <div className="pt-3 mt-3 border-t border-dashed border-gray-300 flex justify-between items-center text-xl font-black text-gray-900">
+                <span>Grand Total</span>
+                <span>${parseFloat(transaction.amount).toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="bg-slate-50 p-6 text-center text-xs text-gray-400 font-medium border-t border-gray-100">
-            <p>Thank you for dining with us!</p>
-            <p className="mt-1">Powered by OnTable</p>
+          <div className="bg-slate-900 p-6 text-center text-gray-400 font-medium text-xs">
+            <p className="text-white font-bold mb-1 text-sm tracking-wide">Thank you for dining with us!</p>
+            <p className="opacity-60">Powered by OnTable AI</p>
           </div>
         </div>
 
