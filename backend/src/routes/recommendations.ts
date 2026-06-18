@@ -46,17 +46,24 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
         });
         
         // Find top 3 cheap sides/beverages/desserts for impulse buys
-        const fallbackItems = allMenuItems
+        let fallbackItems = allMenuItems
           .filter(item => 
             item.category.toLowerCase().includes('side') || 
             item.category.toLowerCase().includes('beverage') || 
             item.category.toLowerCase().includes('drink') ||
             item.category.toLowerCase().includes('add') ||
             item.category.toLowerCase().includes('dessert') ||
-            parseFloat(item.price) <= 6.0
+            parseFloat(item.price as unknown as string) <= 6.0
           )
-          .sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
+          .sort((a, b) => parseFloat(a.price as unknown as string) - parseFloat(b.price as unknown as string))
           .slice(0, 3);
+          
+        // If the menu is expensive and doesn't have these specific categories, just take the 3 absolute cheapest items
+        if (fallbackItems.length === 0 && allMenuItems.length > 0) {
+           fallbackItems = [...allMenuItems]
+             .sort((a, b) => parseFloat(a.price as unknown as string) - parseFloat(b.price as unknown as string))
+             .slice(0, 3);
+        }
           
         if (fallbackItems.length > 0) {
           // Generate fake rules mapping every menu item to these fallback items

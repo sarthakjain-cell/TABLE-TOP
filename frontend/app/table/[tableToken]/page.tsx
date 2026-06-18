@@ -105,20 +105,27 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         .filter(r => r.antecedentId === menuItemId)
         .sort((a, b) => b.confidence - a.confidence);
       
-      if (recsForThisItem.length > 0) {
-        // Find the actual menu items for the recommended IDs
-        const matchedDishes = recsForThisItem
-          .map(r => restaurant?.menu?.find((m: any) => m.id === r.consequentId))
-          .filter(Boolean)
-          .slice(0, 2);
+      let matchedDishes = recsForThisItem
+        .map(r => menuItems.find((m: any) => m.id === r.consequentId))
+        .filter(Boolean)
+        .slice(0, 2);
 
-        if (matchedDishes.length > 0) {
-          const addedDishName = restaurant?.menu?.find((m: any) => m.id === menuItemId)?.name || 'Item';
-          setUpsellItemName(addedDishName);
-          setUpsellRecommendations(matchedDishes);
-          setShowUpsellSheet(true);
-          setHasSeenUpsellSession(true); // Only show once per session to avoid UX friction
-        }
+      // Per-Item Fallback: If no specific rules exist for this dish, recommend the 2 absolute cheapest items as an impulse buy
+      if (matchedDishes.length === 0 && menuItems.length > 0) {
+        matchedDishes = [...menuItems]
+          .filter(m => m.id !== menuItemId && m.isAvailable)
+          .sort((a, b) => parseFloat(a.price as unknown as string) - parseFloat(b.price as unknown as string))
+          .slice(0, 2);
+        console.log("Fallback triggered! matchedDishes length:", matchedDishes.length);
+      }
+
+      console.log("Final matchedDishes length before showing sheet:", matchedDishes.length);
+      if (matchedDishes.length > 0) {
+        const addedDishName = menuItems.find((m: any) => m.id === menuItemId)?.name || 'Item';
+        setUpsellItemName(addedDishName);
+        setUpsellRecommendations(matchedDishes);
+        setShowUpsellSheet(true);
+        setHasSeenUpsellSession(true); // Only show once per session to avoid UX friction
       }
     }
   };
