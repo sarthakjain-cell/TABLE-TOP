@@ -51,9 +51,9 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   
   // Optimistic UI state for cart quantities
   const [itemBeingCustomized, setItemBeingCustomized] = useState<MenuItem | null>(null);
-  const [customMods, setCustomMods] = useState<string[]>([]);
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
   const [isHalfPortionMod, setIsHalfPortionMod] = useState(false);
+  const [customizingAddedVia, setCustomizingAddedVia] = useState<string | undefined>(undefined);
 
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
   const [recommendationRules, setRecommendationRules] = useState<any[]>([]);
@@ -75,7 +75,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       if (Array.isArray(g) && g.length > 0) {
         setIsHalfPortionMod(isHalf);
         setItemBeingCustomized(item);
-        // Note: We are ignoring addedVia for modifier items in this initial ROI implementation to keep the flow simple
+        setCustomizingAddedVia(addedVia);
         return;
       }
     } catch {}
@@ -1684,7 +1684,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           <div className="bg-white w-full max-w-lg rounded-t-3xl shadow-2xl p-6 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-black text-gray-900 tracking-tight">Customize {itemBeingCustomized.name} {isHalfPortionMod && '(Half)'}</h3>
-              <button onClick={() => setItemBeingCustomized(null)} className="text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-2">
+                <button onClick={() => {
+                  setItemBeingCustomized(null);
+                  setCustomizingAddedVia(undefined);
+                }} className="text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-2">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               </button>
             </div>
@@ -1777,11 +1780,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   <button
                     disabled={missingRequired}
                     onClick={() => {
-                      let finalMods = [];
-                      if (isHalfPortionMod) finalMods.push('Half Portion');
-                      finalMods.push(...selectedModifiers);
-                      handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods);
+                      const finalMods = isHalfPortionMod ? ['Half Portion', ...selectedModifiers] : selectedModifiers;
+                      handleOptimisticAdd(itemBeingCustomized.id, 1, finalMods, customizingAddedVia);
                       setItemBeingCustomized(null);
+                      setSelectedModifiers([]);
+                      setCustomizingAddedVia(undefined);
                     }}
                     className={`w-full font-black text-lg py-4 rounded-2xl shadow-xl active:scale-[0.98] transition-all ${missingRequired ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-600/30'}`}
                   >
