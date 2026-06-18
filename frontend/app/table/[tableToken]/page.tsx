@@ -58,6 +58,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
   const [recommendationRules, setRecommendationRules] = useState<any[]>([]);
   
+  // AI Upsell States
+  const [hasSeenUpsellSession, setHasSeenUpsellSession] = useState(false);
+  const [showUpsellSheet, setShowUpsellSheet] = useState(false);
+  const [upsellItemName, setUpsellItemName] = useState('');
+  const [upsellRecommendations, setUpsellRecommendations] = useState<any[]>([]);
+  
   // Clear optimistic state when real server state updates
   useEffect(() => {
     setOptimisticQuantities({});
@@ -87,6 +93,29 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     }));
     
     addItemToCart(menuItemId, quantity, modifications.length > 0 ? modifications : undefined);
+
+    // AI Upsell Interceptor (Bottom Sheet)
+    if (quantity > 0 && !hasSeenUpsellSession) {
+      const recsForThisItem = recommendationRules
+        .filter(r => r.antecedentId === menuItemId)
+        .sort((a, b) => b.confidence - a.confidence);
+      
+      if (recsForThisItem.length > 0) {
+        // Find the actual menu items for the recommended IDs
+        const matchedDishes = recsForThisItem
+          .map(r => restaurant?.menu?.find((m: any) => m.id === r.consequentId))
+          .filter(Boolean)
+          .slice(0, 2);
+
+        if (matchedDishes.length > 0) {
+          const addedDishName = restaurant?.menu?.find((m: any) => m.id === menuItemId)?.name || 'Item';
+          setUpsellItemName(addedDishName);
+          setUpsellRecommendations(matchedDishes);
+          setShowUpsellSheet(true);
+          setHasSeenUpsellSession(true); // Only show once per session to avoid UX friction
+        }
+      }
+    }
   };
   
   const addDebugLog = (msg: string) => {
@@ -716,38 +745,6 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                               <p className="text-[13px] text-gray-500 mt-2 line-clamp-2 leading-relaxed pr-2 font-medium">
                                 {item.description || 'No description available.'}
                               </p>
-
-                              {/* AI Recommendation Widget */}
-                              {recommendationRules.some(r => r.antecedentId === item.id) && (
-                                <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-2.5">
-                                  <div className="flex items-center gap-1.5 mb-2">
-                                    <span className="text-amber-500 text-sm">✨</span>
-                                    <span className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wide">Frequently bought together</span>
-                                  </div>
-                                  <div className="flex flex-col gap-2">
-                                    {recommendationRules
-                                      .filter(r => r.antecedentId === item.id)
-                                      .slice(0, 2)
-                                      .map(rule => (
-                                        <div key={rule.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-50 shadow-sm">
-                                          <div className="flex flex-col">
-                                            <span className="text-[12px] font-bold text-gray-800">{rule.consequent?.name || 'Recommended Item'}</span>
-                                            <span className="text-[10px] text-gray-500 font-medium">+${decimalMath.formatCurrency(rule.consequent?.price || '0')}</span>
-                                          </div>
-                                          <button 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleItemAddClick(rule.consequent, false);
-                                            }}
-                                            className="bg-amber-100 text-amber-700 font-bold text-[10px] px-3 py-1.5 rounded-full btn-tactile"
-                                          >
-                                            ADD
-                                          </button>
-                                        </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
                               
                               {!item.imageUrl && (
                                 <div className="mt-4">
@@ -968,6 +965,66 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     );
                   })()}
                 </div>
+
+                {/* Cart 'You May Also Like' AI Widget */}
+                {(() => {
+                  if (tableSession?.cart?.items?.length > 0) {
+                    const cartItemIds = new Set(tableSession.cart.items.map((i: any) => i.menuItemId));
+                    
+                    // Find all rules where the antecedent is in the cart, but the consequent is NOT in the cart
+                    const cartRecommendations = recommendationRules
+                      .filter(r => cartItemIds.has(r.antecedentId) && !cartItemIds.has(r.consequentId))
+                      .sort((a, b) => b.confidence - a.confidence);
+                    
+                    // Extract unique recommended dishes
+                    const recommendedDishesMap = new Map();
+                    cartRecommendations.forEach(r => {
+                      if (!recommendedDishesMap.has(r.consequentId)) {
+                        const dish = restaurant?.menu?.find((m: any) => m.id === r.consequentId);
+                        if (dish) recommendedDishesMap.set(r.consequentId, dish);
+                      }
+                    });
+                    
+                    const recommendedDishes = Array.from(recommendedDishesMap.values()).slice(0, 4);
+
+                    if (recommendedDishes.length > 0) {
+                      return (
+                        <div className="mt-6 mb-4">
+                          <div className="flex items-center gap-1.5 mb-3 px-1">
+                            <span className="text-amber-500 text-lg">✨</span>
+                            <h4 className="text-[15px] font-black text-gray-900 tracking-tight">You might have missed</h4>
+                          </div>
+                          <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar">
+                            {recommendedDishes.map((dish: any) => (
+                              <div key={dish.id} className="snap-start min-w-[140px] w-[140px] bg-white border border-gray-100 rounded-2xl p-3 shadow-sm flex flex-col justify-between shrink-0">
+                                <div>
+                                  {dish.imageUrl ? (
+                                    <div className="w-full h-20 bg-gray-100 rounded-xl mb-2 overflow-hidden">
+                                      <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-full h-20 bg-gray-50 rounded-xl mb-2 flex items-center justify-center border border-dashed border-gray-200">
+                                      <span className="text-gray-300 text-2xl">🍽️</span>
+                                    </div>
+                                  )}
+                                  <h5 className="text-[13px] font-bold text-gray-900 leading-tight line-clamp-2">{dish.name}</h5>
+                                  <p className="text-[11px] font-bold text-gray-500 mt-1">${decimalMath.formatCurrency(dish.price)}</p>
+                                </div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleItemAddClick(dish, false); }}
+                                  className="mt-3 w-full border border-brand-primary text-brand-primary font-bold text-[11px] py-1.5 rounded-lg active:bg-brand-primary active:text-white transition-colors"
+                                >
+                                  ADD
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
 
                 {isHotel ? (
                   <button
@@ -1726,6 +1783,52 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       )}
   
       </main>
+
+      {/* AI Bottom Sheet Upsell (Blinkit style) */}
+      {showUpsellSheet && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowUpsellSheet(false)}></div>
+          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl p-6 animate-slide-up pb-10">
+            <button onClick={() => setShowUpsellSheet(false)} className="absolute top-4 right-5 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">
+              ✕
+            </button>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-sm">✓</div>
+              <h3 className="text-lg font-black text-gray-900">{upsellItemName} Added!</h3>
+            </div>
+            <p className="text-sm font-semibold text-amber-600 mb-5 ml-10">✨ Perfect pairings to go with this:</p>
+            
+            <div className="space-y-3">
+              {upsellRecommendations.map(dish => (
+                <div key={dish.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-3">
+                    {dish.imageUrl ? (
+                      <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm shrink-0">
+                        <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-200 rounded-xl flex items-center justify-center shrink-0">🍽️</div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-[14px] font-bold text-gray-900">{dish.name}</span>
+                      <span className="text-[12px] font-semibold text-gray-500">${decimalMath.formatCurrency(dish.price)}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleItemAddClick(dish, false);
+                      setShowUpsellSheet(false);
+                    }}
+                    className="bg-brand-primary text-white font-bold text-xs px-4 py-2 rounded-xl active:scale-95 shadow-md shadow-brand-primary/20"
+                  >
+                    ADD
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4. Digital Call Bell Grid Modal */}
       {showBellModal && (
