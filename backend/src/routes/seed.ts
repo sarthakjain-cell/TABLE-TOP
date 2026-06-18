@@ -123,12 +123,23 @@ export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         ...fakeDishes.map(d => d.name)
       ];
 
-      await prisma.menuItem.deleteMany({
-        where: {
-          restaurantId,
-          name: { in: namesToDelete }
-        }
+      // Find the IDs of the menu items to delete
+      const itemsToDelete = await prisma.menuItem.findMany({
+        where: { restaurantId, name: { in: namesToDelete } }
       });
+      const itemIdsToDelete = itemsToDelete.map(item => item.id);
+
+      if (itemIdsToDelete.length > 0) {
+        // Delete OrderItems associated with these menu items to prevent Foreign Key constraints (Restrict)
+        await prisma.orderItem.deleteMany({
+          where: { menuItemId: { in: itemIdsToDelete } }
+        });
+
+        // Now safely delete the redundant menu items
+        await prisma.menuItem.deleteMany({
+          where: { id: { in: itemIdsToDelete } }
+        });
+      }
 
       // Insert the 200 clean dynamic dishes
       await prisma.menuItem.createMany({ data: fakeDishes });
