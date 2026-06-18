@@ -116,9 +116,24 @@ export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         }
       }
 
+      // First, clean up all the exact names of the fake dishes we generated so we don't have redundancy
+      const namesToDelete = [
+        "Classic Beef Burger", "Chicken Tikka Masala", "Margherita Pizza", "Caesar Salad", 
+        "French Fries", "Chocolate Lava Cake", "Garlic Bread", "Cola", "Mango Lassi", "Paneer Butter Masala",
+        ...fakeDishes.map(d => d.name)
+      ];
+
+      await prisma.menuItem.deleteMany({
+        where: {
+          restaurantId,
+          name: { in: namesToDelete }
+        }
+      });
+
+      // Insert the 200 clean dynamic dishes
       await prisma.menuItem.createMany({ data: fakeDishes });
 
-      return reply.send({ success: true, message: `Seeded ${fakeDishes.length} fake dishes for ${restaurantId}` });
+      return reply.send({ success: true, message: `Cleaned up redundant data and successfully seeded ${fakeDishes.length} unique fake dishes for ${restaurantId}` });
     } catch (err: any) {
       console.error(err);
       return reply.code(500).send({ error: err.message });

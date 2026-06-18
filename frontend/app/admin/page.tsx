@@ -1636,7 +1636,7 @@ export default function AdminPage() {
                   }}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium"
                 >
-                  1. Seed 200 Dishes
+                  1. Seed 20 Dishes
                 </button>
                 <button 
                   onClick={() => {
