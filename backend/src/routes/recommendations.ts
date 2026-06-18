@@ -9,7 +9,7 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
     
     try {
       // Find all rules for this restaurant
-      const rules = await prisma.recommendationRule.findMany({
+      let rules = await prisma.recommendationRule.findMany({
         where: { restaurantId },
         orderBy: [
           { lift: 'desc' },
@@ -19,6 +19,45 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
           consequent: true // Include the recommended menu item details
         }
       });
+
+      // --- COLD START FALLBACK ---
+      if (rules.length === 0) {
+        // Fetch all menu items for this restaurant
+        const allMenuItems = await prisma.menuItem.findMany({ 
+          where: { restaurantId, isAvailable: true } 
+        });
+        
+        // Find top 3 cheap sides/beverages/desserts for impulse buys
+        const fallbackItems = allMenuItems
+          .filter(item => 
+            item.category.toLowerCase().includes('side') || 
+            item.category.toLowerCase().includes('beverage') || 
+            item.category.toLowerCase().includes('drink') ||
+            item.category.toLowerCase().includes('add') ||
+            item.category.toLowerCase().includes('dessert') ||
+            parseFloat(item.price) <= 6.0
+          )
+          .sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
+          .slice(0, 3);
+          
+        if (fallbackItems.length > 0) {
+          // Generate fake rules mapping every menu item to these fallback items
+          rules = allMenuItems.flatMap(item => 
+            fallbackItems
+              .filter(fb => fb.id !== item.id) // Don't recommend the item itself
+              .map(fb => ({
+                id: `fallback-${item.id}-${fb.id}`,
+                antecedentId: item.id,
+                consequentId: fb.id,
+                confidence: 0.99,
+                lift: 2.0,
+                restaurantId,
+                createdAt: new Date(),
+                consequent: fb
+              }))
+          ) as any;
+        }
+      }
 
       return reply.send(rules);
     } catch (err: any) {
