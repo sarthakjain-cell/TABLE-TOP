@@ -814,20 +814,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </button>
                 ))}
               </div>
-                            <div className="flex items-center justify-between px-4 mt-1 mb-2">
-                <div className="relative">
-                  <select 
-                    value={sortOption} 
-                    onChange={(e) => setSortOption(e.target.value as any)}
-                    className="appearance-none bg-white border border-gray-200 text-gray-700 text-[11px] font-extrabold py-1.5 pl-3 pr-7 rounded-full outline-none shadow-sm tracking-wide"
-                  >
-                    <option value="RECOMMENDED">SORT: DEFAULT</option>
-                    <option value="LOW_TO_HIGH">PRICE: LOW TO HIGH</option>
-                    <option value="HIGH_TO_LOW">PRICE: HIGH TO LOW</option>
-                    <option value="HIGHLY_ORDERED">HIGHLY ORDERED</option>
-                  </select>
-                  <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-                </div>
+              <div className="flex items-center justify-end px-4 mt-1 mb-2">
                 <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
                   <div className="w-3 h-3 border border-green-500 flex items-center justify-center rounded-sm shrink-0">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
