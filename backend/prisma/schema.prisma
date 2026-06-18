@@ -64,6 +64,7 @@ model Restaurant {
   updatedAt         DateTime        @updatedAt
   tables            Table[]
   menuItems         MenuItem[]
+  recommendationRules RecommendationRule[]
 }
 
 model Table {
@@ -111,6 +112,8 @@ model MenuItem {
   restaurantId   String
   restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]
+  antecedentRules RecommendationRule[] @relation("RuleAntecedent")
+  consequentRules RecommendationRule[] @relation("RuleConsequent")
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -179,4 +182,22 @@ model OrderItemPayment {
 
   @@index([transactionId])
   @@index([orderItemId])
+}
+
+model RecommendationRule {
+  id              String   @id @default(uuid())
+  antecedentId    String   // The item the user is viewing (e.g., Burger)
+  consequentId    String   // The recommended item (e.g., Fries)
+  confidence      Float    // Probability of the rule
+  lift            Float    // Strength of the association
+  restaurantId    String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  antecedent      MenuItem @relation("RuleAntecedent", fields: [antecedentId], references: [id], onDelete: Cascade)
+  consequent      MenuItem @relation("RuleConsequent", fields: [consequentId], references: [id], onDelete: Cascade)
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([antecedentId])
+  @@index([restaurantId])
 }
