@@ -2,9 +2,9 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '../prisma';
 
 export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  fastify.post('/api/seed/orders', async (request, reply) => {
+  fastify.get('/api/seed/orders', async (request, reply) => {
     try {
-      const { restaurantId } = request.body as { restaurantId: string };
+      const { restaurantId } = request.query as { restaurantId: string };
       if (!restaurantId) return reply.code(400).send({ error: 'Missing restaurantId' });
 
       // Check if restaurant exists
@@ -94,9 +94,9 @@ export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
   });
 
-  fastify.post('/api/seed/menu', async (request, reply) => {
+  fastify.get('/api/seed/menu', async (request, reply) => {
     try {
-      const { restaurantId } = request.body as { restaurantId: string };
+      const { restaurantId } = request.query as { restaurantId: string };
       if (!restaurantId) return reply.code(400).send({ error: 'Missing restaurantId' });
 
       const fakeDishes = [
