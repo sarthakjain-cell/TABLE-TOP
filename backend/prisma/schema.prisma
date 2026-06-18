@@ -143,6 +143,7 @@ model OrderItem {
   price         Decimal            @db.Decimal(10, 2) // Captured price at checkout/order time to avoid menu updates affecting past orders
   modifications String[]           // Array of user requests like "No onions", "Extra cheese"
   isServed      Boolean            @default(false)
+  addedVia      String?            @default("MANUAL") // Tracks if item was added manually or via ML_WIDGET
   payments      OrderItemPayment[]
   createdAt     DateTime           @default(now())
 

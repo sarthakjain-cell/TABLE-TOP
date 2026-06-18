@@ -49,7 +49,7 @@ interface SocketContextType {
   isConnected: boolean;
   tableSession: TableSessionState | null;
   joinTableSession: (tableId: string, sessionId: string) => void;
-  addItemToCart: (menuItemId: string, quantity: number, modifications?: string[]) => void;
+  addItemToCart: (menuItemId: string, quantity: number, modifications?: string[], addedVia?: string) => void;
   submitCart: () => Promise<{ success: boolean; error?: string }>;
   requestHelp: (requestType: string) => void;
   authToken: string | null;
@@ -272,10 +272,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const addItemToCart = (menuItemId: string, quantity: number, modifications?: string[]) => {
+  const addItemToCart = (menuItemId: string, quantity: number, modifications?: string[], addedVia?: string) => {
     const currentSocket = socketRef.current;
-    if (currentSocket && currentSocket.connected) {
-      currentSocket.emit('addItemToCart', { menuItemId, quantity, modifications }, (res: any) => {
+    if (currentSocket) {
+      currentSocket.emit('addItemToCart', { menuItemId, quantity, modifications, addedVia }, (res: any) => {
         if (!res?.success) {
           console.error('Error adding item to cart:', res?.error);
         }

@@ -39,7 +39,7 @@ export interface ClientToServerEvents {
   joinTable: (data: { tableId: string; sessionId: string }, callback?: (res: any) => void) => void;
   joinSession: (data: { tableId: string; sessionId: string }, callback?: (res: any) => void) => void;
   addItemToCart: (
-    data: { menuItemId: string; quantity: number; modifications?: string[] },
+    data: { menuItemId: string; quantity: number; modifications?: string[]; addedVia?: string },
     callback?: (res: { success: boolean; error?: string }) => void
   ) => void;
   submitCart: (
@@ -326,7 +326,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
     socket.on('joinSession', handleJoinSession);
 
     // Handle adding/removing items from table cart collaboratively
-    socket.on('addItemToCart', async ({ menuItemId, quantity, modifications }, callback) => {
+    socket.on('addItemToCart', async ({ menuItemId, quantity, modifications, addedVia }, callback) => {
       const sessionId = socket.data.sessionId;
       if (!sessionId) {
         const errMsg = 'No active session joined';
@@ -439,7 +439,8 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
                   menuItemId,
                   quantity: qtyToAdd,
                   price: itemPrice,
-                  modifications: modifications || []
+                  modifications: modifications || [],
+                  addedVia: addedVia || 'MANUAL'
                 }
               });
             }

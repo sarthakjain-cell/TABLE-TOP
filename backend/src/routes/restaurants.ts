@@ -216,4 +216,40 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
       return reply.code(500).send({ error: 'Failed to update settings' });
     }
   });
+  // Calculate AI ROI
+  fastify.get<{ Params: { id: string } }>('/api/restaurants/:id/ai-roi', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+    const { id } = request.params;
+    
+    try {
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const ordersWithMLItems = await prisma.orderItem.findMany({
+        where: {
+          addedVia: 'ML_WIDGET',
+          createdAt: {
+            gte: firstDayOfMonth
+          },
+          order: {
+            session: {
+              restaurantId: id
+            },
+            status: {
+              not: 'CANCELLED'
+            }
+          }
+        }
+      });
+      
+      let totalROI = 0;
+      for (const item of ordersWithMLItems) {
+        totalROI += (Number(item.price) * Number(item.quantity));
+      }
+      
+      return { totalRevenue: totalROI };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to calculate AI ROI' });
+    }
+  });
 };

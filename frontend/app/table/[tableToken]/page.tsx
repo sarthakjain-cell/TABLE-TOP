@@ -69,19 +69,24 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     setOptimisticQuantities({});
   }, [tableSession?.cart?.items]);
 
-  const handleItemAddClick = (item: MenuItem, isHalf: boolean = false) => {
+  const handleItemAddClick = (item: MenuItem, isHalf: boolean = false, addedVia?: string) => {
     try {
       const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups;
       if (Array.isArray(g) && g.length > 0) {
         setIsHalfPortionMod(isHalf);
         setItemBeingCustomized(item);
+        // Note: We are ignoring addedVia for modifier items in this initial ROI implementation to keep the flow simple
         return;
       }
     } catch {}
-    handleOptimisticAdd(item.id, 1, isHalf ? ['Half Portion'] : []);
+    
+    try {
+      if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
+    } catch {}
+    handleOptimisticAdd(item.id, 1, isHalf ? ['Half Portion'] : [], addedVia);
   };
 
-  const handleOptimisticAdd = (menuItemId: string, quantity: number, modifications: string[] = []) => {
+  const handleOptimisticAdd = (menuItemId: string, quantity: number, modifications: string[] = [], addedVia?: string) => {
     const key = `${menuItemId}-${JSON.stringify(modifications)}`;
     
     const serverItem = tableSession?.cart?.items?.find((i: any) => i.menuItemId === menuItemId && JSON.stringify(i.modifications || []) === JSON.stringify(modifications));
@@ -92,7 +97,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       [key]: Math.max(0, (prev[key] !== undefined ? prev[key] : baseQuantity) + quantity)
     }));
     
-    addItemToCart(menuItemId, quantity, modifications.length > 0 ? modifications : undefined);
+    addItemToCart(menuItemId, quantity, modifications.length > 0 ? modifications : undefined, addedVia);
 
     // AI Upsell Interceptor (Bottom Sheet)
     if (quantity > 0 && !hasSeenUpsellSession) {
@@ -1011,7 +1016,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                                   <p className="text-[11px] font-bold text-gray-500 mt-1">${decimalMath.formatCurrency(dish.price)}</p>
                                 </div>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); handleItemAddClick(dish, false); }}
+                                  onClick={(e) => { e.stopPropagation(); handleItemAddClick(dish, false, 'ML_WIDGET'); }}
                                   className="mt-3 w-full border border-brand-primary text-brand-primary font-bold text-[11px] py-1.5 rounded-lg active:bg-brand-primary active:text-white transition-colors"
                                 >
                                   ADD
@@ -1816,7 +1821,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </div>
                   <button
                     onClick={() => {
-                      handleItemAddClick(dish, false);
+                      handleItemAddClick(dish, false, 'ML_WIDGET');
                       setShowUpsellSheet(false);
                     }}
                     className="bg-brand-primary text-white font-bold text-xs px-4 py-2 rounded-xl active:scale-95 shadow-md shadow-brand-primary/20"
