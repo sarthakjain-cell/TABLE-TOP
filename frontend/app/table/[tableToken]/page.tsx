@@ -56,6 +56,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [isHalfPortionMod, setIsHalfPortionMod] = useState(false);
 
   const [optimisticQuantities, setOptimisticQuantities] = useState<Record<string, number>>({});
+  const [recommendationRules, setRecommendationRules] = useState<any[]>([]);
   
   // Clear optimistic state when real server state updates
   useEffect(() => {
@@ -253,8 +254,18 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         .catch((err) => {
           setError(err.message || 'Failed to sync with table session');
         });
+
+      // Also fetch ML recommendations in the background
+      fetch(`/api/restaurants/${restaurant?.id || tableToken.split('-')[0]}/recommendations`)
+        .then(res => res.json())
+        .then(rules => {
+          if (Array.isArray(rules)) {
+            setRecommendationRules(rules);
+          }
+        })
+        .catch(err => console.log('Silent recommendations fetch failed', err));
     }
-  }, [tableToken]);
+  }, [tableToken, restaurant?.id]);
 
   // 2. Register real-time pickup audio chime listeners
   useEffect(() => {
