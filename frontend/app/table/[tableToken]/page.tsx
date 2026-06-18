@@ -702,6 +702,38 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                               <p className="text-[13px] text-gray-500 mt-2 line-clamp-2 leading-relaxed pr-2 font-medium">
                                 {item.description || 'No description available.'}
                               </p>
+
+                              {/* AI Recommendation Widget */}
+                              {recommendationRules.some(r => r.antecedentId === item.id) && (
+                                <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-2.5">
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <span className="text-amber-500 text-sm">✨</span>
+                                    <span className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wide">Frequently bought together</span>
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    {recommendationRules
+                                      .filter(r => r.antecedentId === item.id)
+                                      .slice(0, 2)
+                                      .map(rule => (
+                                        <div key={rule.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-50 shadow-sm">
+                                          <div className="flex flex-col">
+                                            <span className="text-[12px] font-bold text-gray-800">{rule.consequent?.name || 'Recommended Item'}</span>
+                                            <span className="text-[10px] text-gray-500 font-medium">+${decimalMath.formatCurrency(rule.consequent?.price || '0')}</span>
+                                          </div>
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleItemAddClick(rule.consequent, false);
+                                            }}
+                                            className="bg-amber-100 text-amber-700 font-bold text-[10px] px-3 py-1.5 rounded-full btn-tactile"
+                                          >
+                                            ADD
+                                          </button>
+                                        </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               
                               {!item.imageUrl && (
                                 <div className="mt-4">
