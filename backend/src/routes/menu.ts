@@ -330,8 +330,19 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         menuCache.set(cacheKey, items);
       }
       
-      // Filter the master list to only serve available items to the table
-      return items.filter(item => item.isAvailable);
+      // Fetch historical order counts for 'Highly Ordered' sorting and AI recommendations
+      const orderCounts = await prisma.orderItem.groupBy({
+        by: ['menuItemId'],
+        _sum: { quantity: true },
+        where: { order: { session: { restaurantId: table.restaurantId } } }
+      });
+      const countsMap = new Map(orderCounts.map(oc => [oc.menuItemId, Number(oc._sum.quantity)]));
+      
+      // Filter the master list to only serve available items to the table, and attach orderCount
+      return items.filter(item => item.isAvailable).map(item => ({
+        ...item,
+        orderCount: countsMap.get(item.id) || 0
+      }));
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to fetch table menu items' });

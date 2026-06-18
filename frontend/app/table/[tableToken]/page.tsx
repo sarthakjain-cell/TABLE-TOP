@@ -5,7 +5,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
 import nextDynamic from 'next/dynamic';
 import Script from 'next/script';
-import { CheckCircle, Users } from 'lucide-react';
+import { CheckCircle, Users, Menu, X, ChevronDown } from 'lucide-react';
 
 const QRCodeSVG = nextDynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
   ssr: false,
@@ -24,6 +24,7 @@ interface MenuItem {
   isVeg?: boolean;
   modifierGroups?: any;
   imageUrl?: string;
+  orderCount?: number;
 }
 
 export const dynamic = 'force-dynamic';
@@ -63,11 +64,128 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [showUpsellSheet, setShowUpsellSheet] = useState(false);
   const [upsellItemName, setUpsellItemName] = useState('');
   const [upsellRecommendations, setUpsellRecommendations] = useState<any[]>([]);
+
+  const [sortOption, setSortOption] = useState<'RECOMMENDED' | 'LOW_TO_HIGH' | 'HIGH_TO_LOW' | 'HIGHLY_ORDERED'>('RECOMMENDED');
+  const [isMenuFabVisible, setIsMenuFabVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (activeTab !== 'menu') return;
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        setIsMenuFabVisible(false);
+      } else {
+        setIsMenuFabVisible(true);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeTab]);
+
+  const recommendedItems = React.useMemo(() => {
+    return [...menuItems]
+      .filter(item => item.isAvailable)
+      .sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0))
+      .slice(0, 3);
+  }, [menuItems]);
+  
+  const recommendedItemIds = React.useMemo(() => {
+    return new Set(recommendedItems.map(i => i.id));
+  }, [recommendedItems]);
+
   
   // Clear optimistic state when real server state updates
   useEffect(() => {
     setOptimisticQuantities({});
   }, [tableSession?.cart?.items]);
+
+
+  const renderItemCard = (item: MenuItem, isHorizontal: boolean = false) => (
+    <div
+      key={item.id}
+      className={`bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3 h-full ${isHorizontal ? 'w-[300px] shrink-0 snap-start' : 'w-full'}`}
+    >
+      {/* Left Column */}
+      <div className={`flex flex-col ${item.imageUrl ? 'w-[60%]' : 'w-full'}`}>
+        {item.isVeg !== false ? (
+          <div className="w-4 h-4 border border-green-600 flex items-center justify-center rounded-sm mb-2 opacity-90">
+            <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+          </div>
+        ) : (
+          <div className="w-4 h-4 border border-red-600 flex items-center justify-center rounded-sm mb-2 opacity-90">
+            <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-red-600 mt-0.5"></div>
+          </div>
+        )}
+        
+        <h3 className="text-[17px] font-bold text-gray-900 leading-snug">
+          {item.name}
+        </h3>
+        <div className="text-[15px] font-semibold text-gray-700 mt-1">
+          ${decimalMath.formatCurrency(item.price)}
+          {item.hasHalfPortion && item.halfPrice && (
+            <span className="ml-2 text-[11px] text-brand-secondary bg-brand-secondary/10 px-2 py-0.5 rounded-full">Half: ${decimalMath.formatCurrency(item.halfPrice)}</span>
+          )}
+        </div>
+        <p className="text-[13px] text-gray-500 mt-2 line-clamp-2 leading-relaxed pr-2 font-medium">
+          {item.description || 'No description available.'}
+        </p>
+        
+        {!item.imageUrl && (
+          <div className="mt-4">
+            {item.isAvailable ? (
+              item.hasHalfPortion ? (
+                <div className="flex gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD FULL</button>
+                  <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD HALF</button>
+                  {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
+                    <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-brand-primary font-bold text-[10px] uppercase ml-1 flex flex-col items-center justify-center btn-tactile"><span>⚙️</span><span>Modify</span></button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-start">
+                  <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile">ADD</button>
+                  {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
+                    <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-gray-400 text-[10px] mt-1 font-semibold text-center w-[75px]">Customizable</button>
+                  )}
+                </div>
+              )
+            ) : (
+              <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-md">Sold Out</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Right Column (Image) */}
+      {item.imageUrl && (
+        <div className="relative w-[42%] max-w-[150px] shrink-0 flex flex-col items-center mt-2">
+          <div className="aspect-[4/5] w-full rounded-2xl overflow-hidden shadow-sm bg-gray-50">
+            <img src={`${item.imageUrl}?v=${imageCacheBuster.current}`} alt={item.name} className={`w-full h-full object-cover ${!item.isAvailable ? 'grayscale opacity-60' : ''}`} loading="lazy" />
+          </div>
+          {item.isAvailable ? (
+            item.hasHalfPortion ? (
+              <div className="absolute -bottom-3 flex gap-1 justify-center w-full px-2">
+                <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">FULL</button>
+                <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">HALF</button>
+              </div>
+            ) : (
+              <div className="absolute -bottom-4 w-full flex flex-col items-center">
+                <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100">ADD</button>
+                {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
+                  <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-gray-400 text-[9px] mt-1 font-semibold text-center z-10 bg-white/90 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">Customizable</button>
+                )}
+              </div>
+            )
+          ) : (
+            <div className="absolute -bottom-2 bg-gray-100 text-gray-500 border border-gray-200 font-bold text-[10px] px-3 py-1.5 rounded-lg shadow-sm">Sold Out</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const handleItemAddClick = (item: MenuItem, isHalf: boolean = false, addedVia?: string) => {
     try {
@@ -696,7 +814,20 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </button>
                 ))}
               </div>
-              <div className="flex items-center justify-end px-4 mt-1 mb-2">
+                            <div className="flex items-center justify-between px-4 mt-1 mb-2">
+                <div className="relative">
+                  <select 
+                    value={sortOption} 
+                    onChange={(e) => setSortOption(e.target.value as any)}
+                    className="appearance-none bg-white border border-gray-200 text-gray-700 text-[11px] font-extrabold py-1.5 pl-3 pr-7 rounded-full outline-none shadow-sm tracking-wide"
+                  >
+                    <option value="RECOMMENDED">SORT: DEFAULT</option>
+                    <option value="LOW_TO_HIGH">PRICE: LOW TO HIGH</option>
+                    <option value="HIGH_TO_LOW">PRICE: HIGH TO LOW</option>
+                    <option value="HIGHLY_ORDERED">HIGHLY ORDERED</option>
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                </div>
                 <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
                   <div className="w-3 h-3 border border-green-500 flex items-center justify-center rounded-sm shrink-0">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
@@ -716,6 +847,17 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             </div>
 
             <div className="flex flex-col pb-20 px-2 md:px-6">
+              {recommendedItems.length > 0 && !searchQuery && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-3 flex items-center gap-2">
+                    <span className="text-brand-primary text-2xl animate-pulse">✨</span> Recommended For You
+                  </h2>
+                  <div className="flex gap-4 overflow-x-auto no-scrollbar px-3 pb-4 snap-x">
+                    {recommendedItems.map(item => renderItemCard(item, true))}
+                  </div>
+                </div>
+              )}
+
               {categories.filter(c => c !== 'All').map(category => {
                  const itemsInCategory = menuItems.filter(item => 
                    (item.category || 'Main Course') === category && 
@@ -1840,6 +1982,59 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Floating Menu Category Button */}
+      {activeTab === 'menu' && (
+        <div className={`fixed bottom-24 right-5 z-40 transition-all duration-300 ease-in-out ${isMenuFabVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+          <button 
+            onClick={() => setShowCategoryModal(true)}
+            className="bg-gray-900 text-white shadow-xl shadow-gray-900/30 font-bold text-sm px-5 py-3.5 rounded-full flex items-center gap-2 active:scale-95 transition-transform border border-gray-700"
+          >
+            <Menu size={18} />
+            <span>Menu</span>
+          </button>
+        </div>
+      )}
+
+      {/* Category Bottom Sheet Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-[110] flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCategoryModal(false)}></div>
+          <div className="relative bg-white w-full rounded-t-3xl shadow-2xl animate-slide-up pb-10 max-h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 shrink-0">
+              <h3 className="text-xl font-black text-gray-900">Menu Categories</h3>
+              <button onClick={() => setShowCategoryModal(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-4 py-2">
+              <div className="grid grid-cols-1 gap-1">
+                {categories.filter(c => c !== 'All').map((c) => {
+                  const itemsCount = menuItems.filter(item => (item.category || 'Main Course') === c && (!isVegOnly || item.isVeg !== false)).length;
+                  if (itemsCount === 0) return null;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        setShowCategoryModal(false);
+                        setActiveCategory(c);
+                        setTimeout(() => {
+                          document.getElementById(`category-${c.replace(/\s+/g, '-')}`)?.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                      }}
+                      className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 rounded-2xl transition-colors active:bg-gray-100 text-left w-full"
+                    >
+                      <span className="font-bold text-[15px] text-gray-800">{c}</span>
+                      <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{itemsCount}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

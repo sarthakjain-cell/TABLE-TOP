@@ -6,7 +6,7 @@ import { decimalMath } from '../../utils/decimalMath';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRouter } from 'next/navigation';
 import ModifierBuilder from './ModifierBuilder';
-import { LayoutDashboard, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
+import { LayoutDashboard, Folder, FolderPlus, ArrowLeft, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
 
 interface OrderItem {
   orderedQuantity: number;
@@ -89,6 +89,18 @@ export default function AdminPage() {
   const [ledgerFilterMonth, setLedgerFilterMonth] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger' | 'settings'>('dashboard');
+
+  const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+
+  const allFolders = React.useMemo(() => {
+    const existing = new Set(menuItems.map(m => m.category || 'Main Course'));
+    emptyFolders.forEach(f => existing.add(f));
+    return Array.from(existing).sort();
+  }, [menuItems, emptyFolders]);
+
   const [inputRestaurantId, setInputRestaurantId] = useState('');
   const [inputPasscode, setInputPasscode] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -737,7 +749,7 @@ export default function AdminPage() {
           halfPrice: newDishHasHalfPortion ? Number(newDishHalfPrice) : null,
           hasHalfPortion: newDishHasHalfPortion,
           description: newDishDesc,
-          category: newDishCategory || "Main Course",
+          category: currentFolder || newDishCategory || "Main Course",
           imageUrl: newDishImageUrl || undefined,
           modifierGroups: newDishModifierGroups
         })
@@ -1339,225 +1351,337 @@ export default function AdminPage() {
             </div>
           )}
 
+          
           {activeTab === 'menu' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-               <div className="flex justify-between items-center">
+            <div className="max-w-5xl mx-auto space-y-6">
+               <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Menu Editor</h3>
-                    <p className="text-sm text-gray-500 mt-1">Manage dishes and real-time availability.</p>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                      {currentFolder ? (
+                        <>
+                          <button onClick={() => setCurrentFolder(null)} className="hover:bg-gray-100 p-2 rounded-xl transition-colors text-gray-500">
+                            <ArrowLeft size={24} />
+                          </button>
+                          <span><Folder className="inline-block text-brand-primary mr-2 mb-1" size={28} /> {currentFolder}</span>
+                        </>
+                      ) : (
+                        "Menu Drive"
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1 ml-1">
+                      {currentFolder ? 'Manage dishes in this folder.' : 'Organize your menu into folders.'}
+                    </p>
                   </div>
                   <button 
                     onClick={recalculateMLRules}
                     disabled={isRecalculatingML}
-                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-2 px-4 rounded-xl shadow-sm disabled:opacity-50 transition-all btn-tactile"
+                    className="flex items-center gap-2 bg-gradient-to-r from-brand-primary to-indigo-600 hover:from-brand-primary/90 hover:to-indigo-500 text-white font-bold py-2.5 px-5 rounded-2xl shadow-md shadow-brand-primary/20 disabled:opacity-50 transition-all active:scale-95"
                   >
-                    <span>✨</span>
+                    <span className="animate-pulse">✨</span>
                     {isRecalculatingML ? 'Training AI...' : 'Recalculate AI Recommendations'}
                   </button>
                 </div>
-                
-                <div className="mb-4">
-                  <input
-                    type="text"
-                    placeholder="Search dishes by name..."
-                    value={menuSearchQuery}
-                    onChange={(e) => setMenuSearchQuery(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-400 shadow-sm"
-                  />
-                </div>
-                
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        <th className="px-6 py-4">Dish</th>
-                        <th className="px-6 py-4">Price</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {menuItems.filter(item => !menuSearchQuery || item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).map(item => (
-                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 flex items-center gap-4">
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded object-cover border border-gray-200" />
-                            ) : (
-                              <div className="w-12 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-xl">🍽️</div>
-                            )}
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">{item.name}</p>
-                              <p className="text-xs text-gray-500 truncate max-w-xs">{item.description}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                            ${Number(item.price).toFixed(2)}
-                            {item.hasHalfPortion && item.halfPrice && (
-                              <span className="block text-xs text-blue-600 mt-1">Half: ${Number(item.halfPrice).toFixed(2)}</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              item.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                            }`}>
-                              {item.isAvailable ? 'Available' : 'Sold Out'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => openEditModal(item)}
-                              className="text-xs font-semibold px-3 py-1.5 rounded transition-colors text-blue-600 hover:bg-blue-50"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => toggleDishAvailability(item.id, item.isAvailable)}
-                              className={`text-xs font-semibold px-3 py-1.5 rounded transition-colors ${
-                                item.isAvailable ? 'text-red-600 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'
-                              }`}
-                            >
-                              {item.isAvailable ? 'Mark 86' : 'Mark Available'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
-                  <h4 className="text-lg font-bold text-gray-900 mb-4">Add New Dish</h4>
-                  <form onSubmit={handleAddDish} className="space-y-4 max-w-lg">
-                    <div className="grid grid-cols-2 gap-4">
-                      <input
-                        type="text" placeholder="Dish Name" required
-                        value={newDishName} onChange={(e) => setNewDishName(e.target.value)}
-                        className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      />
-                      <input
-                        type="number" step="0.01" placeholder="Price (e.g. 12.99)" required
-                        value={newDishPrice} onChange={(e) => setNewDishPrice(e.target.value)}
-                        className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <input 
-                        type="checkbox" 
-                        id="newHalfPortion"
-                        checked={newDishHasHalfPortion}
-                        onChange={(e) => setNewDishHasHalfPortion(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                      />
-                      <label htmlFor="newHalfPortion" className="text-sm font-medium text-gray-700">Offers Half Portion?</label>
-                    </div>
-                    {newDishHasHalfPortion && (
-                      <div className="mb-4">
-                        <input
-                          type="number" step="0.01" placeholder="Half Portion Price" required
-                          value={newDishHalfPrice} onChange={(e) => setNewDishHalfPrice(e.target.value)}
-                          className="w-1/2 bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
+                {!currentFolder ? (
+                  /* ROOT FOLDER VIEW */
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {allFolders.map(folder => (
+                      <div 
+                        key={folder}
+                        onClick={() => setCurrentFolder(folder)}
+                        className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md hover:border-brand-primary/30 hover:-translate-y-1 transition-all group flex flex-col items-center justify-center gap-3 aspect-square"
+                      >
+                        <div className="w-16 h-16 bg-blue-50 text-brand-primary rounded-2xl flex items-center justify-center group-hover:bg-brand-primary group-hover:text-white transition-colors">
+                          <Folder size={32} />
+                        </div>
+                        <span className="font-bold text-gray-900 text-center">{folder}</span>
+                        <span className="text-xs font-semibold text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
+                          {menuItems.filter(m => (m.category || 'Main Course') === folder).length} items
+                        </span>
                       </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <input
-                        type="text" list="categories" placeholder="Category (e.g. Breads)" required
-                        value={newDishCategory} onChange={(e) => setNewDishCategory(e.target.value)}
-                        className="bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      />
-                      <textarea
-                        placeholder="Description"
-                        value={newDishDesc} onChange={(e) => setNewDishDesc(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 text-gray-900 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        rows={1}
-                      />
-                    </div>
-                    <datalist id="categories">
-                      <option value="Breakfast" />
-                      <option value="Snacks" />
-                      <option value="Main Course" />
-                      <option value="Dinner" />
-                      <option value="Breads" />
-                      <option value="Desserts" />
-                      <option value="Beverages" />
-                    </datalist>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Dish Photo (Optional)</label>
-                      {newDishImageUrl ? (
-                        <div className="relative rounded-lg overflow-hidden border border-gray-200">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={newDishImageUrl} 
-                            alt="Dish preview" 
-                            className="w-full h-48 object-cover"
+                    ))}
+                    
+                    {/* Create New Folder Button */}
+                    <div 
+                      onClick={() => setIsCreatingFolder(true)}
+                      className="bg-gray-50 p-6 rounded-3xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-brand-primary hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-3 aspect-square group"
+                    >
+                      {isCreatingFolder ? (
+                        <div className="w-full flex flex-col items-center gap-3 px-2" onClick={e => e.stopPropagation()}>
+                          <input 
+                            autoFocus
+                            type="text" 
+                            placeholder="Folder Name"
+                            value={newFolderName}
+                            onChange={e => setNewFolderName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && newFolderName.trim()) {
+                                setEmptyFolders(prev => [...prev, newFolderName.trim()]);
+                                setNewFolderName('');
+                                setIsCreatingFolder(false);
+                              }
+                              if (e.key === 'Escape') setIsCreatingFolder(false);
+                            }}
+                            className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-center text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-brand-primary shadow-sm"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(false)}
-                            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-sm hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
-                            aria-label="Remove image"
-                          >
-                            <X size={16} />
-                          </button>
+                          <div className="flex gap-2 w-full">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (newFolderName.trim()) {
+                                  setEmptyFolders(prev => [...prev, newFolderName.trim()]);
+                                  setNewFolderName('');
+                                }
+                                setIsCreatingFolder(false);
+                              }}
+                              className="flex-1 bg-brand-primary text-white text-xs font-bold py-2 rounded-lg"
+                            >
+                              Create
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setIsCreatingFolder(false); }}
+                              className="flex-1 bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-lg"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <div 
-                          className={`
-                            relative flex flex-col items-center justify-center p-6 
-                            border-2 border-dashed rounded-lg transition-colors cursor-pointer
-                            ${isUploadingImage 
-                              ? 'border-blue-400 bg-blue-50' 
-                              : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 bg-gray-50'
-                            }
-                          `}
-                          onDragOver={handleDragOver}
-                          onDrop={handleDrop}
-                          onClick={() => !isUploadingImage && fileInputRef.current?.click()}
-                        >
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept="image/*"
-                            onChange={(e) => handleImageUpload(e, false)}
-                            disabled={isUploadingImage}
-                          />
-                          
-                          {isUploadingImage ? (
-                            <>
-                              <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
-                              <span className="text-sm text-blue-600 font-medium">Uploading...</span>
-                            </>
-                          ) : (
-                            <>
-                              <UploadCloud className="w-8 h-8 text-gray-400 mb-2" />
-                              <span className="text-sm text-gray-600 text-center">
-                                Click or drag image to upload
-                              </span>
-                            </>
+                        <>
+                          <div className="w-16 h-16 bg-white text-gray-400 rounded-2xl flex items-center justify-center shadow-sm group-hover:text-brand-primary transition-colors">
+                            <FolderPlus size={32} />
+                          </div>
+                          <span className="font-bold text-gray-500 group-hover:text-brand-primary">New Folder</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* INSIDE FOLDER VIEW */
+                  <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                      <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                        <input
+                          type="text"
+                          placeholder={`Search dishes in ${currentFolder}...`}
+                          value={menuSearchQuery}
+                          onChange={(e) => setMenuSearchQuery(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-2xl px-5 py-3 text-sm font-medium focus:ring-2 focus:ring-brand-primary/50 outline-none placeholder-gray-400 shadow-sm"
+                        />
+                      </div>
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                            <th className="px-6 py-4">Dish</th>
+                            <th className="px-6 py-4">Price</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {menuItems
+                            .filter(item => (item.category || 'Main Course') === currentFolder)
+                            .filter(item => !menuSearchQuery || item.name.toLowerCase().includes(menuSearchQuery.toLowerCase()))
+                            .map(item => (
+                            <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
+                              <td className="px-6 py-4 flex items-center gap-4">
+                                {item.imageUrl ? (
+                                  <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-xl shadow-sm">🍽️</div>
+                                )}
+                                <div>
+                                  <p className="text-sm font-bold text-gray-900">{item.name}</p>
+                                  <p className="text-xs font-medium text-gray-500 truncate max-w-xs">{item.description}</p>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                                $${Number(item.price).toFixed(2)}
+                                {item.hasHalfPortion && item.halfPrice && (
+                                  <span className="block text-[10px] font-extrabold text-brand-primary bg-brand-primary/10 w-max px-2 py-0.5 rounded-full mt-1">HALF: $${Number(item.halfPrice).toFixed(2)}</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm ${
+                                  item.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {item.isAvailable ? 'Available' : 'Sold Out'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => openEditModal(item)}
+                                  className="text-xs font-bold px-4 py-2 rounded-xl transition-colors bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => toggleDishAvailability(item.id, item.isAvailable)}
+                                  className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors shadow-sm ${
+                                    item.isAvailable ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                  }`}
+                                >
+                                  {item.isAvailable ? 'Mark 86' : 'Mark Available'}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {menuItems.filter(item => (item.category || 'Main Course') === currentFolder).length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-12 text-center text-gray-400 font-medium">
+                                This folder is empty. Add a dish below!
+                              </td>
+                            </tr>
                           )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Add Dish Form (Scoped to Folder) */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                      <h4 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center text-sm">➕</span>
+                        Add Dish to {currentFolder}
+                      </h4>
+                      <form onSubmit={handleAddDish} className="space-y-5 max-w-2xl">
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-gray-500 uppercase tracking-wide">Dish Name</label>
+                            <input
+                              type="text" placeholder="e.g. Garlic Naan" required
+                              value={newDishName} onChange={(e) => setNewDishName(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-shadow"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-gray-500 uppercase tracking-wide">Price ($)</label>
+                            <input
+                              type="number" step="0.01" placeholder="0.00" required
+                              value={newDishPrice} onChange={(e) => setNewDishPrice(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-shadow"
+                            />
+                          </div>
                         </div>
-                      )}
-                      {uploadError && (
-                        <p className="text-sm text-red-500 mt-1">{uploadError}</p>
-                      )}
+                        
+                        <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                          <input 
+                            type="checkbox" 
+                            id="newHalfPortion"
+                            checked={newDishHasHalfPortion}
+                            onChange={(e) => setNewDishHasHalfPortion(e.target.checked)}
+                            className="w-5 h-5 text-brand-primary rounded border-gray-300 focus:ring-brand-primary"
+                          />
+                          <label htmlFor="newHalfPortion" className="text-sm font-bold text-gray-700 cursor-pointer select-none">
+                            Offer Half Portion Size?
+                          </label>
+                        </div>
+
+                        {newDishHasHalfPortion && (
+                          <div className="space-y-1.5 animate-in slide-in-from-top-2 fade-in">
+                            <label className="text-xs font-extrabold text-gray-500 uppercase tracking-wide">Half Portion Price ($)</label>
+                            <input
+                              type="number" step="0.01" placeholder="0.00" required={newDishHasHalfPortion}
+                              value={newDishHalfPrice} onChange={(e) => setNewDishHalfPrice(e.target.value)}
+                              className="w-1/2 bg-gray-50 border border-gray-200 text-gray-900 px-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-shadow"
+                            />
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-5 pt-2">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-gray-500 uppercase tracking-wide">Dietary Type</label>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setNewDishIsVeg(true)}
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${newDishIsVeg ? 'bg-green-50 border-green-200 text-green-700 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                              >
+                                🟩 Veg
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setNewDishIsVeg(false)}
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${!newDishIsVeg ? 'bg-red-50 border-red-200 text-red-700 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                              >
+                                🟥 Non-Veg
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-extrabold text-gray-500 uppercase tracking-wide">Description (Optional)</label>
+                          <textarea
+                            placeholder="Brief appetizing description..."
+                            value={newDishDesc} onChange={(e) => setNewDishDesc(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-3 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-shadow min-h-[80px] resize-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 pt-2">
+                          <label className="text-xs font-extrabold text-gray-500 uppercase tracking-wide">Dish Image</label>
+                          <div className="flex items-start gap-4">
+                            {newDishImageUrl ? (
+                              <div className="relative group shrink-0">
+                                <img src={newDishImageUrl} alt="Preview" className="w-24 h-24 rounded-2xl object-cover shadow-sm border border-gray-200" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveImage(false)}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg hover:scale-110 transition-transform"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex-1">
+                                <div 
+                                  className={`w-full border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${isUploadingImage ? 'border-brand-primary/50 bg-blue-50/30' : 'border-gray-300 hover:border-brand-primary hover:bg-gray-50'} cursor-pointer`}
+                                  onClick={() => fileInputRef.current?.click()}
+                                  onDragOver={handleDragOver}
+                                  onDrop={(e) => handleDrop(e, false)}
+                                >
+                                  <input 
+                                    type="file" ref={fileInputRef} onChange={(e) => handleImageUpload(e, false)} className="hidden" accept="image/*"
+                                  />
+                                  {isUploadingImage ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                      <Loader2 className="animate-spin text-brand-primary" size={24} />
+                                      <span className="text-sm font-bold text-gray-600">Uploading...</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-2">
+                                      <UploadCloud className="text-gray-400" size={32} />
+                                      <div>
+                                        <p className="text-sm font-bold text-gray-700">Click to upload image</p>
+                                        <p className="text-xs font-medium text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                {uploadError && <p className="text-xs font-bold text-red-500 mt-2 bg-red-50 p-2 rounded-lg">{uploadError}</p>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-gray-100">
+                          <ModifierBuilder groups={newDishModifierGroups} onChange={setNewDishModifierGroups} />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isSavingDish || isUploadingImage}
+                          className="w-full bg-gray-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-xl shadow-gray-900/20 disabled:opacity-50 transition-all active:scale-[0.98] mt-4"
+                        >
+                          {isSavingDish ? 'Adding Dish...' : `Add to ${currentFolder}`}
+                        </button>
+                      </form>
                     </div>
-                    <div className="mb-4 border-t border-gray-200 pt-4 mt-2">
-                      <ModifierBuilder groups={newDishModifierGroups} onChange={setNewDishModifierGroups} />
-                    </div>
-                    <button 
-                      type="submit" 
-                      disabled={isSavingDish || isUploadingImage} 
-                      className={`font-semibold py-2 px-4 rounded-lg text-sm transition ${isSavingDish || isUploadingImage ? 'bg-blue-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-                    >
-                      {isUploadingImage ? 'Uploading Image...' : isSavingDish ? 'Saving...' : 'Save Dish'}
-                    </button>
-                  </form>
-                </div>
+                  </div>
+                )}
             </div>
           )}
-
-          {activeTab === 'ledger' && (
+{activeTab === 'ledger' && (
              <div className="max-w-4xl mx-auto space-y-6">
                  <div className="flex justify-between items-end">
                   <div>
