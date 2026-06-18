@@ -34,9 +34,10 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
     try {
       // Trigger the Python ML worker over Railway's internal network bridge
       // Fallback to localhost for local testing
-      const mlServiceUrl = process.env.NODE_ENV === 'production' 
-        ? 'http://ml-service.railway.internal:8000/train' 
-        : 'http://127.0.0.1:8000/train';
+      const mlServiceUrl =
+      process.env.NODE_ENV === 'production'
+        ? `http://table-top.railway.internal:8000/train` // Fixed: Railway assigned this specific internal domain
+        : `http://localhost:8000/train`;
         
       const response = await fetch(`${mlServiceUrl}?restaurant_id=${restaurantId}`, {
         method: 'POST'
