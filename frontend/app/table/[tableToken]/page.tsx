@@ -217,35 +217,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     
     addItemToCart(menuItemId, quantity, modifications.length > 0 ? modifications : undefined, addedVia);
 
-    // AI Upsell Interceptor (Bottom Sheet)
-    if (quantity > 0 && !hasSeenUpsellSession) {
-      const recsForThisItem = recommendationRules
-        .filter(r => r.antecedentId === menuItemId)
-        .sort((a, b) => b.confidence - a.confidence);
-      
-      let matchedDishes = recsForThisItem
-        .map(r => menuItems.find((m: any) => m.id === r.consequentId))
-        .filter(Boolean)
-        .slice(0, 2);
 
-      // Per-Item Fallback: If no specific rules exist for this dish, recommend the 2 absolute cheapest items as an impulse buy
-      if (matchedDishes.length === 0 && menuItems.length > 0) {
-        matchedDishes = [...menuItems]
-          .filter(m => m.id !== menuItemId && m.isAvailable)
-          .sort((a, b) => parseFloat(a.price as unknown as string) - parseFloat(b.price as unknown as string))
-          .slice(0, 2);
-        console.log("Fallback triggered! matchedDishes length:", matchedDishes.length);
-      }
-
-      console.log("Final matchedDishes length before showing sheet:", matchedDishes.length);
-      if (matchedDishes.length > 0) {
-        const addedDishName = menuItems.find((m: any) => m.id === menuItemId)?.name || 'Item';
-        setUpsellItemName(addedDishName);
-        setUpsellRecommendations(matchedDishes);
-        setShowUpsellSheet(true);
-        setHasSeenUpsellSession(true); // Only show once per session to avoid UX friction
-      }
-    }
   };
   
   const addDebugLog = (msg: string) => {
@@ -430,7 +402,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   // 2. Register real-time pickup audio chime listeners
   useEffect(() => {
     const handlePickupAlert = () => {
-      const audio = new Audio('/assets/audio/chime.mp3');
+      const audio = new Audio('/assets/audio/dragon-studio-cute-doorbell-chime-472376.mp3');
       audio.play().catch((err) => console.log('Audio autoplay blocked:', err));
       setShowPickupAlert(true);
     };
@@ -1112,21 +1084,35 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   if (tableSession?.cart?.items?.length > 0) {
                     const cartItemIds = new Set(tableSession.cart.items.map((i: any) => i.menuItemId));
                     
-                    // Find all rules where the antecedent is in the cart, but the consequent is NOT in the cart
+                    // 1 & 2. Full-Cart Analysis, Filter Existing, & Deduplication
                     const cartRecommendations = recommendationRules
                       .filter(r => cartItemIds.has(r.antecedentId) && !cartItemIds.has(r.consequentId))
                       .sort((a, b) => b.confidence - a.confidence);
                     
-                    // Extract unique recommended dishes
                     const recommendedDishesMap = new Map();
                     cartRecommendations.forEach(r => {
                       if (!recommendedDishesMap.has(r.consequentId)) {
                         const dish = restaurant?.menu?.find((m: any) => m.id === r.consequentId);
-                        if (dish) recommendedDishesMap.set(r.consequentId, dish);
+                        if (dish && dish.isAvailable) recommendedDishesMap.set(r.consequentId, dish);
                       }
                     });
                     
-                    const recommendedDishes = Array.from(recommendedDishesMap.values()).slice(0, 4);
+                    let recommendedDishes = Array.from(recommendedDishesMap.values());
+
+                    // 3. The Fallback Injection
+                    if (recommendedDishes.length < 7) {
+                      const popularFallback = [...menuItems]
+                        .filter(m => m.isAvailable && !cartItemIds.has(m.id) && !recommendedDishesMap.has(m.id))
+                        .sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
+                      
+                      for (const fallbackDish of popularFallback) {
+                        if (recommendedDishes.length >= 7) break;
+                        recommendedDishes.push(fallbackDish);
+                      }
+                    }
+                    
+                    // 4. UI Truncation (Max 7)
+                    recommendedDishes = recommendedDishes.slice(0, 7);
 
                     if (recommendedDishes.length > 0) {
                       return (

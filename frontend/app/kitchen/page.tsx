@@ -200,7 +200,7 @@ export default function KitchenPage() {
         message: `Table ${tableNumber} is requesting: ${requestType}`,
         type: requestType.includes('Cash') ? 'cash' : 'call'
       });
-      const audio = new Audio('/assets/audio/chime.mp3');
+      const audio = new Audio('/assets/audio/dragon-studio-cute-doorbell-chime-472376.mp3');
       audio.play().catch(err => console.log('Audio blocked', err));
       
       setTimeout(() => setKitchenToast(null), 15000);

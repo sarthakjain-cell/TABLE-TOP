@@ -489,7 +489,7 @@ export default function AdminPage() {
     const handleHelpRequested = ({ tableNumber, requestType }: { tableNumber: string, requestType: string }) => {
       // Note: backend emits the table's ID as tableNumber here
       setTables(prev => prev.map(t => t.id === tableNumber ? { ...t, waiterRequested: true } : t));
-      const audio = new Audio('/assets/audio/chime.mp3');
+      const audio = new Audio('/assets/audio/dragon-studio-cute-doorbell-chime-472376.mp3');
       audio.play().catch(err => console.log('Audio blocked', err));
       handleAdminSync(null);
     };
