@@ -1977,7 +1977,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
       {/* Floating Menu Category Button */}
       {activeTab === 'menu' && (
-        <div className={`fixed bottom-24 right-5 z-40 transition-all duration-300 ease-in-out ${isMenuFabVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+        <div className={`fixed right-5 z-40 transition-all duration-300 ease-in-out ${tableSession.cart.items.length > 0 ? 'bottom-[155px]' : 'bottom-24'} ${isMenuFabVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
           <button 
             onClick={() => setShowCategoryModal(true)}
             className="bg-gray-900 text-white shadow-xl shadow-gray-900/30 font-bold text-sm px-5 py-3.5 rounded-full flex items-center gap-2 active:scale-95 transition-transform border border-gray-700"
