@@ -204,6 +204,9 @@ export const seedRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       const itemIds = existingItems.map(item => item.id);
       
       if (itemIds.length > 0) {
+        // Manually delete RecommendationRules to prevent FK constraint errors if cascade isn't configured at DB level
+        await prisma.recommendationRule.deleteMany({ where: { restaurantId } });
+
         const orderItems = await prisma.orderItem.findMany({ where: { menuItemId: { in: itemIds } } });
         const orderItemIds = orderItems.map(oi => oi.id);
         

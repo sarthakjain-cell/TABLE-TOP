@@ -1379,14 +1379,15 @@ export default function AdminPage() {
                         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
                         try {
                           const res = await fetch(`${API_BASE}/api/seed-indian?restaurantId=${restaurantId}`);
+                          const text = await res.text();
                           if (res.ok) {
                             alert("Indian Menu successfully restored!");
                             window.location.reload();
                           } else {
-                            alert("Failed to restore menu");
+                            alert(`Failed to restore menu: ${text}`);
                           }
-                        } catch (err) {
-                          alert("Error restoring menu");
+                        } catch (err: any) {
+                          alert(`Error restoring menu: ${err.message}`);
                         }
                       }}
                       className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-500/90 hover:to-red-500 text-white font-bold py-2.5 px-5 rounded-2xl shadow-md disabled:opacity-50 transition-all active:scale-95"
