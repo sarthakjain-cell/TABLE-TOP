@@ -110,7 +110,7 @@ async function run() {
   console.log('Generating 1,500 highly correlated sessions...');
 
   let createdCount = 0;
-  for (let i = 0; i < 1500; i++) {
+  for (let i = 0; i < 250; i++) {
     const createdAt = getRandomDate(6);
     const tableId = tables.length > 0 ? getRandomElement(tables).id : (await prisma.table.findFirst()).id;
     
