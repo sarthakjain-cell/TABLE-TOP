@@ -1377,15 +1377,66 @@ export default function AdminPage() {
                       onClick={async () => {
                         if (!confirm("This will wipe your current menu and restore the Indian menu. Continue?")) return;
                         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+                        
                         try {
-                          const res = await fetch(`${API_BASE}/api/seed-indian?restaurantId=${restaurantId}`);
-                          const text = await res.text();
-                          if (res.ok) {
-                            alert("Indian Menu successfully restored!");
-                            window.location.reload();
-                          } else {
-                            alert(`Failed to restore menu: ${text}`);
+                          // Fetch current menu
+                          const getMenuRes = await fetch(`${API_BASE}/api/menu?restaurantId=${restaurantId}`);
+                          const currentMenu = await getMenuRes.json();
+                          
+                          // Delete existing items one by one
+                          for (const item of currentMenu) {
+                            try {
+                              await fetch(`${API_BASE}/api/menu/${item.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${authToken}` }
+                              });
+                            } catch (e) {
+                              console.warn("Failed to delete item", item.id);
+                            }
                           }
+                          
+                          // Create new Indian items
+                          const menuData = [
+                            { name: 'Onion Bhaji', price: 6.95, category: 'Appetizers', isVeg: true },
+                            { name: 'Samosa Chat', price: 7.95, category: 'Appetizers', isVeg: true },
+                            { name: 'Paneer Pakora', price: 8.95, category: 'Appetizers', isVeg: true },
+                            { name: 'Gobi Pakora', price: 7.95, category: 'Appetizers', isVeg: true },
+                            { name: 'Lamb Samosa', price: 8.95, category: 'Appetizers', isVeg: false },
+                            { name: 'Alu Mater Samosa', price: 6.95, category: 'Appetizers', isVeg: true },
+                            { name: 'Dal Makhni', price: 13.95, category: 'Main Course', isVeg: true },
+                            { name: 'Paneer Butter Masala', price: 14.95, category: 'Main Course', isVeg: true },
+                            { name: 'Palak Paneer', price: 14.95, category: 'Main Course', isVeg: true },
+                            { name: 'Kadai Paneer', price: 14.95, category: 'Main Course', isVeg: true },
+                            { name: 'Malai Kofta', price: 14.95, category: 'Main Course', isVeg: true },
+                            { name: 'Butter Chicken', price: 16.95, category: 'Main Course', isVeg: false },
+                            { name: 'Chicken Tikka Masala', price: 16.95, category: 'Main Course', isVeg: false },
+                            { name: 'Lamb Rogan Josh', price: 18.95, category: 'Main Course', isVeg: false },
+                            { name: 'Goat Curry', price: 19.95, category: 'Main Course', isVeg: false },
+                            { name: 'Fish Curry', price: 17.95, category: 'Main Course', isVeg: false },
+                            { name: 'Garlic Naan', price: 3.95, category: 'Breads', isVeg: true },
+                            { name: 'Butter Naan', price: 3.50, category: 'Breads', isVeg: true },
+                            { name: 'Plain Naan', price: 2.95, category: 'Breads', isVeg: true },
+                            { name: 'Tandoori Roti', price: 2.95, category: 'Breads', isVeg: true },
+                            { name: 'Lacha Paratha', price: 4.95, category: 'Breads', isVeg: true },
+                            { name: 'Cheese Naan', price: 4.95, category: 'Breads', isVeg: true },
+                            { name: 'Mango Lassi', price: 4.95, category: 'Beverages', isVeg: true },
+                            { name: 'Sweet Lassi', price: 3.95, category: 'Beverages', isVeg: true },
+                            { name: 'Salted Lassi', price: 3.95, category: 'Beverages', isVeg: true },
+                            { name: 'Masala Chai', price: 2.95, category: 'Beverages', isVeg: true },
+                            { name: 'Diet Coke', price: 2.50, category: 'Beverages', isVeg: true },
+                            { name: 'Sprite', price: 2.50, category: 'Beverages', isVeg: true }
+                          ];
+                          
+                          for (const item of menuData) {
+                            await fetch(`${API_BASE}/api/restaurants/${restaurantId}/menu`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                              body: JSON.stringify({ ...item, isAvailable: true, hasHalfPortion: false, modifierGroups: [] })
+                            });
+                          }
+                          
+                          alert("Indian Menu successfully restored!");
+                          window.location.reload();
                         } catch (err: any) {
                           alert(`Error restoring menu: ${err.message}`);
                         }

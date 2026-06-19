@@ -233,9 +233,6 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
           order: {
             session: {
               restaurantId: id
-            },
-            status: {
-              not: 'CANCELLED'
             }
           }
         }
