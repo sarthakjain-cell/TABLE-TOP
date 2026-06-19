@@ -1428,7 +1428,7 @@ export default function AdminPage() {
                           ];
                           
                           for (const item of menuData) {
-                            await fetch(`${API_BASE}/api/restaurants/${restaurantId}/menu`, {
+                            await fetch(`${API_BASE}/api/menu`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                               body: JSON.stringify({ ...item, isAvailable: true, hasHalfPortion: false, modifierGroups: [] })

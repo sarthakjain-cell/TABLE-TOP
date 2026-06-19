@@ -366,11 +366,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       const fetchMenuUrl = `/api/table/${tableToken}/menu`;
 
       Promise.all([
-        fetch(fetchVerifyUrl).then((res) => {
+        fetch(fetchVerifyUrl, { cache: 'no-store' }).then((res) => {
           if (!res.ok) throw new Error('Invalid table scan token');
           return res.json();
         }),
-        fetch(fetchMenuUrl).then((res) => res.json())
+        fetch(fetchMenuUrl, { cache: 'no-store' }).then((res) => res.json())
       ])
         .then(([verifyData, items]) => {
           setRestaurant(verifyData.restaurant);
