@@ -1372,14 +1372,37 @@ export default function AdminPage() {
                       {currentFolder ? 'Manage dishes in this folder.' : 'Organize your menu into folders.'}
                     </p>
                   </div>
-                  <button 
-                    onClick={recalculateMLRules}
-                    disabled={isRecalculatingML}
-                    className="flex items-center gap-2 bg-gradient-to-r from-brand-primary to-indigo-600 hover:from-brand-primary/90 hover:to-indigo-500 text-white font-bold py-2.5 px-5 rounded-2xl shadow-md shadow-brand-primary/20 disabled:opacity-50 transition-all active:scale-95"
-                  >
-                    <span className="animate-pulse">✨</span>
-                    {isRecalculatingML ? 'Training AI...' : 'Recalculate AI Recommendations'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={async () => {
+                        if (!confirm("This will wipe your current menu and restore the Indian menu. Continue?")) return;
+                        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+                        try {
+                          const res = await fetch(`${API_BASE}/api/seed-indian?restaurantId=${restaurantId}`);
+                          if (res.ok) {
+                            alert("Indian Menu successfully restored!");
+                            window.location.reload();
+                          } else {
+                            alert("Failed to restore menu");
+                          }
+                        } catch (err) {
+                          alert("Error restoring menu");
+                        }
+                      }}
+                      className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-500/90 hover:to-red-500 text-white font-bold py-2.5 px-5 rounded-2xl shadow-md disabled:opacity-50 transition-all active:scale-95"
+                    >
+                      <span>🔄</span>
+                      Restore Indian Menu
+                    </button>
+                    <button 
+                      onClick={recalculateMLRules}
+                      disabled={isRecalculatingML}
+                      className="flex items-center gap-2 bg-gradient-to-r from-brand-primary to-indigo-600 hover:from-brand-primary/90 hover:to-indigo-500 text-white font-bold py-2.5 px-5 rounded-2xl shadow-md shadow-brand-primary/20 disabled:opacity-50 transition-all active:scale-95"
+                    >
+                      <span className="animate-pulse">✨</span>
+                      {isRecalculatingML ? 'Training AI...' : 'Recalculate AI Recommendations'}
+                    </button>
+                  </div>
                 </div>
 
                 {!currentFolder ? (
