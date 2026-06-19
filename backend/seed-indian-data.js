@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const RESTAURANT_ID = 'HOTEL01'; // Assuming this is the test restaurant
+const RESTAURANT_ID = '432f3304-7c0e-42d0-9132-e8c2f3ea8756';
 
 const menuData = [
   // APPETIZERS
