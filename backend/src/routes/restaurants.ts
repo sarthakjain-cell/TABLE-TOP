@@ -231,6 +231,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
             gte: firstDayOfMonth
           },
           order: {
+            status: { not: 'PENDING' },
             session: {
               restaurantId: id
             }

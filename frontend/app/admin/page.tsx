@@ -465,6 +465,12 @@ export default function AdminPage() {
           'Pragma': 'no-cache',
           'Expires': '0'
         };
+        
+        fetch(`/api/restaurants/${storedRestId}/ai-roi`, { headers, cache: 'no-store' })
+          .then(res => res.json())
+          .then(data => { if (data && typeof data.totalRevenue === 'number') setAiRoiTotal(data.totalRevenue); })
+          .catch(console.error);
+
         fetch(`/api/restaurants/${storedRestId}?t=${Date.now()}`, { headers, cache: 'no-store' }).then(res => res.json()).then(data => {
           if(data && data.tables && Array.isArray(data.tables)) {
             setTables(prevTables => {
