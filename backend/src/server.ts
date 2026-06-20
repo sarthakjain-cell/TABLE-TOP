@@ -68,9 +68,20 @@ const PORT = Number(process.env.PORT) || 5000;
 
 const start = async () => {
   try {
+    process.on('uncaughtException', (err) => {
+      console.error('CRITICAL UNCAUGHT EXCEPTION:', err);
+      process.exit(1);
+    });
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('CRITICAL UNHANDLED REJECTION at:', promise, 'reason:', reason);
+      process.exit(1);
+    });
+
     await fastify.ready();
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
+    console.log(`Server successfully started on port ${PORT}`);
   } catch (err) {
+    console.error('CRITICAL STARTUP ERROR:', err);
     fastify.log.error(err);
     process.exit(1);
   }
