@@ -260,7 +260,7 @@ export default function FinanceDashboard() {
                   <tr className="bg-gray-50 text-xs font-black text-gray-500 uppercase tracking-widest">
                     <th className="px-6 py-4 border-b border-gray-200">Date & Time</th>
                     <th className="px-6 py-4 border-b border-gray-200">Table/Room</th>
-                    <th className="px-6 py-4 border-b border-gray-200">Guest Name</th>
+                    <th className="px-6 py-4 border-b border-gray-200">Guest Details</th>
                     <th className="px-6 py-4 border-b border-gray-200">Method</th>
                     <th className="px-6 py-4 border-b border-gray-200">Amount</th>
                     <th className="px-6 py-4 border-b border-gray-200">Delivery Fee</th>
@@ -282,8 +282,9 @@ export default function FinanceDashboard() {
                       <td className="px-6 py-4 font-black text-gray-800">
                         {tx.roomOrTable}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 font-medium">
-                        {tx.customerName || '-'}
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-gray-800">{tx.customerName || '-'}</div>
+                        <div className="text-xs font-semibold text-indigo-500 mt-0.5">{tx.customerPhone || 'N/A'}</div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold border ${tx.paymentMethod === 'CASH' ? 'bg-amber-50 text-amber-600 border-amber-200' : tx.paymentMethod === 'ONLINE' || tx.paymentMethod === 'UPI' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
