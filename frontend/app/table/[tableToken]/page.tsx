@@ -491,6 +491,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const remaining = grandTotal - totalAllocated;
 
   const executeCheckout = async (paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'ROOM') => {
+    if (!customerName.trim() || !customerPhone.trim()) {
+      alert("Please enter your Name and Phone Number to proceed.");
+      return;
+    }
+    
     addDebugLog('executeCheckout started with ' + paymentMethod);
     if (!tableSession) {
       addDebugLog('tableSession is null');
