@@ -276,8 +276,14 @@ export default function AdminPage() {
         }
       });
       if (!res.ok) {
-         const data = await res.json();
-         throw new Error(data.error);
+         let errorMsg = 'Failed to verify transaction';
+         try {
+           const data = await res.json();
+           errorMsg = data.message || data.error || errorMsg;
+         } catch(e) {
+           errorMsg = `HTTP Error ${res.status} ${res.statusText}`;
+         }
+         throw new Error(errorMsg);
       }
       
       // Optimistically update tables
@@ -1303,16 +1309,10 @@ export default function AdminPage() {
                               <span className="text-lg font-bold text-gray-900 tabular-nums tracking-tight">${realTotal || '0.00'}</span>
                             </div>
                             {table.activeSession && (
-                              <div className="flex gap-2 w-full mt-2">
-                                <button
-                                  onClick={() => handleAdminCollectCash(table.activeSession!.id, table.id)}
-                                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors shadow-sm"
-                                >
-                                  Settle Bill in Cash
-                                </button>
+                              <div className="flex w-full mt-2">
                                 <button
                                   onClick={() => handleForceCloseSession(table.activeSession!.id, table.id)}
-                                  className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors border border-red-200"
+                                  className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-[10px] uppercase tracking-wider transition-colors border border-red-200"
                                 >
                                   Force Vacate
                                 </button>
