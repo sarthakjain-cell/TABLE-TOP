@@ -692,10 +692,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const upiString = `upi://pay?pa=${encodedUpiId}&pn=${encodedMerchantName}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Session_${tableSession?.sessionId}`;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col w-full relative pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50/60 via-white to-sky-50/50 flex flex-col w-full relative pb-24">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       {/* 1. Contextual Mode Header */}
-      <header className="glass border-b border-gray-100 sticky top-0 z-40 p-4 shadow-soft">
+      <header className="bg-white/70 backdrop-blur-lg border-b border-orange-100/60 sticky top-0 z-40 p-4 shadow-[0_4px_20px_-10px_rgba(249,115,22,0.15)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {restaurant?.logoUrl ? (
@@ -783,8 +783,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     }}
                     className={`whitespace-nowrap px-5 py-2 rounded-full text-[13px] font-bold transition-all btn-tactile ${
                       activeCategory === c 
-                        ? 'bg-brand-primary text-white shadow-md' 
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                        ? 'bg-gradient-to-r from-orange-500 to-orange-400 text-white shadow-[0_4px_10px_rgba(249,115,22,0.3)]' 
+                        : 'bg-white border border-orange-100 text-gray-700 hover:bg-orange-50/50'
                     }`}
                   >
                     {c}
@@ -2071,7 +2071,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       )}
 
       {/* 5. Sticky Bottom Action Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full glass border-t border-gray-100 pb-safe z-40 flex justify-center">
+      <nav className="fixed bottom-0 left-0 right-0 w-full bg-white/85 backdrop-blur-lg border-t border-orange-100/50 pb-safe z-40 flex justify-center shadow-[0_-8px_30px_-10px_rgba(249,115,22,0.1)]">
         <div className="flex justify-around items-stretch p-2 w-full max-w-2xl md:gap-8">
           <button
             onClick={() => setActiveTab('menu')}
