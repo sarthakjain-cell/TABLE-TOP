@@ -1116,8 +1116,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                       }
                     }
                     
-                    // 4. UI Truncation (Max 7)
-                    recommendedDishes = recommendedDishes.slice(0, 7);
+                    // 4. UI Truncation (Max 10 for tabular layout)
+                    recommendedDishes = recommendedDishes.slice(0, 10);
 
                     if (recommendedDishes.length > 0) {
                       return (
@@ -1126,25 +1126,27 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                             <span className="text-amber-500 text-lg">✨</span>
                             <h4 className="text-[15px] font-black text-gray-900 tracking-tight">You might have missed</h4>
                           </div>
-                          <div className="flex overflow-x-auto gap-3 pb-4 snap-x hide-scrollbar">
+                          <div className="grid grid-cols-1 gap-3 pb-4">
                             {recommendedDishes.map((dish: any) => (
-                              <div key={dish.id} className="snap-start min-w-[140px] w-[140px] bg-white border border-gray-100 rounded-2xl p-3 shadow-sm flex flex-col justify-between shrink-0">
-                                <div>
+                              <div key={dish.id} className="bg-white/80 backdrop-blur-sm border border-orange-100 rounded-2xl p-3 shadow-sm flex items-center justify-between w-full transition-all hover:shadow-md">
+                                <div className="flex items-center gap-3 overflow-hidden">
                                   {dish.imageUrl ? (
-                                    <div className="w-full h-20 bg-gray-100 rounded-xl mb-2 overflow-hidden">
+                                    <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden shrink-0 shadow-sm">
                                       <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
                                     </div>
                                   ) : (
-                                    <div className="w-full h-20 bg-gray-50 rounded-xl mb-2 flex items-center justify-center border border-dashed border-gray-200">
-                                      <span className="text-gray-300 text-2xl">🍽️</span>
+                                    <div className="w-12 h-12 bg-orange-50/50 rounded-xl flex items-center justify-center border border-dashed border-orange-200 shrink-0">
+                                      <span className="text-orange-300 text-lg">🍽️</span>
                                     </div>
                                   )}
-                                  <h5 className="text-[13px] font-bold text-gray-900 leading-tight line-clamp-2">{dish.name}</h5>
-                                  <p className="text-[11px] font-bold text-gray-500 mt-1">${decimalMath.formatCurrency(dish.price)}</p>
+                                  <div className="flex flex-col pr-2">
+                                    <h5 className="text-[13px] font-bold text-gray-900 leading-tight line-clamp-1">{dish.name}</h5>
+                                    <p className="text-[11px] font-extrabold text-brand-primary mt-0.5">${decimalMath.formatCurrency(dish.price)}</p>
+                                  </div>
                                 </div>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleItemAddClick(dish, false, 'ML_WIDGET'); }}
-                                  className="mt-3 w-full border border-brand-primary text-brand-primary font-bold text-[11px] py-1.5 rounded-lg active:bg-brand-primary active:text-white transition-colors"
+                                  className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary font-black text-[11px] px-4 py-2 rounded-xl active:scale-95 transition-transform shrink-0 shadow-sm"
                                 >
                                   ADD
                                 </button>
