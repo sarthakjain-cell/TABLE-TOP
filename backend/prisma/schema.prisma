@@ -160,6 +160,7 @@ model Transaction {
   paymentMethod String?
   customerName       String?            // Metadata tracking for split billing
   customerPhone      String?            // Metadata tracking for split billing
+  tipAmount          Decimal            @db.Decimal(10, 2) @default(0.00) // Zomato Gratitude Corner Tip
   deliveryFeeApplied Decimal            @db.Decimal(10, 2) @default(0.00)
   razorpayOrderId    String?            @unique
   razorpayPaymentId  String?            @unique

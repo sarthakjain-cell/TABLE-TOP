@@ -106,7 +106,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const renderItemCard = (item: MenuItem, isHorizontal: boolean = false) => (
     <div
       key={item.id}
-      className={`bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3 h-full ${isHorizontal ? 'w-[300px] shrink-0 snap-start' : 'w-full'}`}
+      className={`bg-white/85 backdrop-blur-lg rounded-3xl p-4 shadow-soft border border-white flex justify-between items-start gap-3 h-full ${isHorizontal ? 'w-[300px] shrink-0 snap-start' : 'w-full'}`}
     >
       {/* Left Column */}
       <div className={`flex flex-col ${item.imageUrl ? 'w-[60%]' : 'w-full'}`}>
@@ -187,7 +187,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     </div>
   );
 
-  const handleItemAddClick = (item: MenuItem, isHalf: boolean = false, addedVia?: string) => {
+  const handleItemAddClick = (item: MenuItem, isHalf: boolean = false, addedVia?: string, skipUpsell: boolean = false) => {
     try {
       const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups;
       if (Array.isArray(g) && g.length > 0) {
@@ -202,6 +202,27 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
       if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
     } catch {}
     handleOptimisticAdd(item.id, 1, isHalf ? ['Half Portion'] : [], addedVia);
+
+    if (!skipUpsell) {
+      // Find recommendation rules where this item is the antecedent
+      const itemRules = restaurant?.recommendationRules?.filter((r: any) => r.antecedentId === item.id) || [];
+      if (itemRules.length > 0) {
+        // Sort by confidence/lift to get top 3
+        const recIds = itemRules
+          .sort((a: any, b: any) => b.confidence - a.confidence)
+          .map((r: any) => r.consequentId);
+          
+        const recItems = recIds
+          .map((id: string) => menuItems.find(m => m.id === id))
+          .filter((m: any) => m && m.isAvailable)
+          .slice(0, 4);
+          
+        if (recItems.length > 0) {
+          setUpsellModalItem(item);
+          setUpsellRecommendations(recItems);
+        }
+      }
+    }
   };
 
   const handleOptimisticAdd = (menuItemId: string, quantity: number, modifications: string[] = [], addedVia?: string) => {
@@ -235,6 +256,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [receiptPhone, setReceiptPhone] = useState('');
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  
+  // Zomato Style Features State
+  const [tipAmount, setTipAmount] = useState<number>(0);
+  const [showBillSummary, setShowBillSummary] = useState(false);
+  const [upsellModalItem, setUpsellModalItem] = useState<any>(null);
+  const [upsellRecommendations, setUpsellRecommendations] = useState<any[]>([]);
+  const [cartRecommendationTab, setCartRecommendationTab] = useState<string>('Popular');
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleItemCount, setVisibleItemCount] = useState(10);
@@ -509,7 +537,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         const response = await fetch(`/api/sessions/${tableSession?.sessionId}/checkout-cart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customerName, customerPhone, paymentMethod })
+          body: JSON.stringify({ customerName, customerPhone, paymentMethod, tipAmount })
         });
         if (!response.ok) {
           const errData = await response.json();
@@ -536,7 +564,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             customerName: customerName || 'Guest',
             customerPhone: customerPhone || '9999999999',
             paymentMethod,
-            items: payloadItems
+            items: payloadItems,
+            tipAmount
           })
         });
 
@@ -692,7 +721,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const upiString = `upi://pay?pa=${encodedUpiId}&pn=${encodedMerchantName}&am=${grandTotal.toFixed(2)}&cu=INR&tn=Session_${tableSession?.sessionId}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50/60 via-white to-sky-50/50 flex flex-col w-full relative pb-24">
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-rose-50 to-indigo-100 flex flex-col w-full relative pb-24">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       {/* 1. Contextual Mode Header */}
       <header className="bg-white/70 backdrop-blur-lg border-b border-orange-100/60 sticky top-0 z-40 p-4 shadow-[0_4px_20px_-10px_rgba(249,115,22,0.15)]">
@@ -836,7 +865,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                        {itemsInCategory.map(item => (
                           <div
                             key={item.id}
-                            className="bg-white rounded-3xl p-4 shadow-soft border border-gray-100 flex justify-between items-start gap-3 w-full h-full"
+                            className="bg-white/85 backdrop-blur-lg rounded-3xl p-4 shadow-soft border border-white flex justify-between items-start gap-3 w-full h-full"
                           >
                             {/* Left Column */}
                             <div className={`flex flex-col ${item.imageUrl ? 'w-[60%]' : 'w-full'}`}>
@@ -1084,75 +1113,105 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                   })()}
                 </div>
 
-                {/* Cart 'You May Also Like' AI Widget */}
+                {/* Cart Recommendation Tabs */}
                 {(() => {
                   if (tableSession?.cart?.items?.length > 0) {
                     const cartItemIds = new Set(tableSession.cart.items.map((i: any) => i.menuItemId));
                     
-                    // 1 & 2. Full-Cart Analysis, Filter Existing, & Deduplication
-                    const cartRecommendations = recommendationRules
-                      .filter(r => cartItemIds.has(r.antecedentId) && !cartItemIds.has(r.consequentId))
-                      .sort((a, b) => b.confidence - a.confidence);
-                    
-                    const recommendedDishesMap = new Map();
-                    cartRecommendations.forEach(r => {
-                      if (!recommendedDishesMap.has(r.consequentId)) {
-                        const dish = restaurant?.menu?.find((m: any) => m.id === r.consequentId);
-                        if (dish && dish.isAvailable) recommendedDishesMap.set(r.consequentId, dish);
-                      }
-                    });
-                    
-                    let recommendedDishes = Array.from(recommendedDishesMap.values());
+                    // Generate Tabs based on available categories
+                    const existingCats = Array.from(new Set(menuItems.map(m => m.category))).filter(Boolean) as string[];
+                    const recTabs = ['Popular'];
+                    const preferred = ['Beverages', 'Desserts', 'Sides', 'Breads'];
+                    preferred.forEach(p => { if (existingCats.includes(p)) recTabs.push(p); });
+                    existingCats.forEach(c => { if (!recTabs.includes(c) && recTabs.length < 5) recTabs.push(c); });
 
-                    // 3. The Fallback Injection
-                    if (recommendedDishes.length < 7) {
-                      const popularFallback = [...menuItems]
-                        .filter(m => m.isAvailable && !cartItemIds.has(m.id) && !recommendedDishesMap.has(m.id))
-                        .sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
+                    let recommendedDishes = [];
+
+                    if (cartRecommendationTab === 'Popular' || !recTabs.includes(cartRecommendationTab)) {
+                      // 1 & 2. Full-Cart Analysis, Filter Existing, & Deduplication
+                      const cartRecommendations = (restaurant?.recommendationRules || [])
+                        .filter((r: any) => cartItemIds.has(r.antecedentId) && !cartItemIds.has(r.consequentId))
+                        .sort((a: any, b: any) => b.confidence - a.confidence);
                       
-                      for (const fallbackDish of popularFallback) {
-                        if (recommendedDishes.length >= 7) break;
-                        recommendedDishes.push(fallbackDish);
+                      const recommendedDishesMap = new Map();
+                      cartRecommendations.forEach((r: any) => {
+                        if (!recommendedDishesMap.has(r.consequentId)) {
+                          const dish = menuItems.find((m: any) => m.id === r.consequentId);
+                          if (dish && dish.isAvailable) recommendedDishesMap.set(r.consequentId, dish);
+                        }
+                      });
+                      
+                      recommendedDishes = Array.from(recommendedDishesMap.values());
+
+                      // 3. The Fallback Injection
+                      if (recommendedDishes.length < 7) {
+                        const popularFallback = [...menuItems]
+                          .filter(m => m.isAvailable && !cartItemIds.has(m.id) && !recommendedDishesMap.has(m.id))
+                          // Assuming popular items have higher orderCount or just take first few
+                          .slice(0, 10);
+                        
+                        for (const fallbackDish of popularFallback) {
+                          if (recommendedDishes.length >= 7) break;
+                          recommendedDishes.push(fallbackDish);
+                        }
                       }
+                    } else {
+                      // Filter by selected category tab
+                      recommendedDishes = menuItems
+                        .filter(m => m.isAvailable && m.category === cartRecommendationTab && !cartItemIds.has(m.id));
                     }
                     
                     // 4. UI Truncation (Max 10 for tabular layout)
                     recommendedDishes = recommendedDishes.slice(0, 10);
 
-                    if (recommendedDishes.length > 0) {
+                    if (recTabs.length > 1) {
                       return (
-                        <div className="mt-6 mb-4">
-                          <div className="flex items-center gap-1.5 mb-3 px-1">
-                            <span className="text-amber-500 text-lg">✨</span>
-                            <h4 className="text-[15px] font-black text-gray-900 tracking-tight">You might have missed</h4>
+                        <div className="mt-8 mb-4">
+                          <h4 className="text-[15px] font-black text-gray-900 tracking-tight mb-3 px-1">Complete your meal with</h4>
+                          
+                          {/* Tabs Row */}
+                          <div className="flex overflow-x-auto no-scrollbar gap-2 mb-4 px-1 pb-1">
+                            {recTabs.map(tab => (
+                              <button
+                                key={tab}
+                                onClick={() => setCartRecommendationTab(tab)}
+                                className={`px-4 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-colors border ${cartRecommendationTab === tab ? 'bg-gray-800 text-white border-gray-800 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                              >
+                                {tab}
+                              </button>
+                            ))}
                           </div>
-                          <div className="grid grid-cols-1 gap-3 pb-4">
-                            {recommendedDishes.map((dish: any) => (
-                              <div key={dish.id} className="bg-white/80 backdrop-blur-sm border border-orange-100 rounded-2xl p-3 shadow-sm flex items-center justify-between w-full transition-all hover:shadow-md">
-                                <div className="flex items-center gap-3 overflow-hidden">
+
+                          {/* Horizontal Cards Row */}
+                          {recommendedDishes.length > 0 ? (
+                            <div className="flex overflow-x-auto no-scrollbar gap-3 pb-4 px-1 snap-x">
+                              {recommendedDishes.map((dish: any) => (
+                                <div key={dish.id} className="snap-start shrink-0 w-[140px] bg-white border border-gray-100 rounded-2xl p-2.5 shadow-sm flex flex-col transition-all hover:shadow-md relative">
                                   {dish.imageUrl ? (
-                                    <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden shrink-0 shadow-sm">
+                                    <div className="w-full aspect-square rounded-xl overflow-hidden mb-2 bg-gray-100">
                                       <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
                                     </div>
                                   ) : (
-                                    <div className="w-12 h-12 bg-orange-50/50 rounded-xl flex items-center justify-center border border-dashed border-orange-200 shrink-0">
-                                      <span className="text-orange-300 text-lg">🍽️</span>
+                                    <div className="w-full aspect-square rounded-xl bg-orange-50/50 mb-2 flex items-center justify-center border border-dashed border-orange-200">
+                                      <span className="text-orange-300 text-2xl">🍽️</span>
                                     </div>
                                   )}
-                                  <div className="flex flex-col pr-2">
-                                    <h5 className="text-[13px] font-bold text-gray-900 leading-tight line-clamp-1">{dish.name}</h5>
-                                    <p className="text-[11px] font-extrabold text-brand-primary mt-0.5">${decimalMath.formatCurrency(dish.price)}</p>
+                                  <h5 className="text-[11px] font-bold text-gray-900 leading-tight line-clamp-2 mb-1 h-[30px]">{dish.name}</h5>
+                                  <div className="flex items-center justify-between mt-auto pt-1">
+                                    <p className="text-[11px] font-black text-gray-800">${dish.price}</p>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleItemAddClick(dish, false, 'CART_TAB', true); }}
+                                      className="bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 font-black text-[10px] px-2 py-1 rounded-lg transition-colors"
+                                    >
+                                      + ADD
+                                    </button>
                                   </div>
                                 </div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleItemAddClick(dish, false, 'ML_WIDGET'); }}
-                                  className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary font-black text-[11px] px-4 py-2 rounded-xl active:scale-95 transition-transform shrink-0 shadow-sm"
-                                >
-                                  ADD
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400 text-center py-6">No items found in this category.</p>
+                          )}
                         </div>
                       );
                     }
@@ -1407,6 +1466,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                      return null;
                    })()}
                 </div>
+                 
+                <button onClick={() => setShowBillSummary(true)} className="w-full text-center text-sm font-bold text-blue-600 underline decoration-dashed underline-offset-4 py-2 hover:text-blue-800 transition-colors">
+                   View Detailed Bill & Add Tip {tipAmount > 0 ? `(Tip: ₹${tipAmount})` : ''}
+                </button>
                 
                 <div className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-sm space-y-4">
                   <input
@@ -1479,6 +1542,10 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     {remaining < -0.01 && <p className="text-red-600 text-sm font-bold mt-1">⚠️ Exceeds total by ${Math.abs(remaining).toFixed(2)}</p>}
                   </div>
                 </div>
+
+                 <button onClick={() => setShowBillSummary(true)} className="w-full text-center text-sm font-bold text-indigo-600 underline decoration-dashed underline-offset-4 py-2 hover:text-indigo-800 transition-colors">
+                   View Detailed Bill & Add Tip {tipAmount > 0 ? `(Tip: ₹${tipAmount})` : ''}
+                 </button>
 
                 {/* Dynamic Rows */}
                 <div className="space-y-3">
@@ -2069,6 +2136,149 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               <span className="text-xl leading-none">›</span>
             </div>
           </button>
+        </div>
+      )}
+
+      {/* Perfect Pairing Upsell Modal */}
+      {upsellModalItem && upsellRecommendations.length > 0 && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setUpsellModalItem(null); setUpsellRecommendations([]); }}></div>
+          <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl relative z-10 animate-slide-up overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center border border-green-100 text-lg">✨</div>
+                <div>
+                  <h3 className="font-black text-gray-900 text-lg leading-tight">1 item added</h3>
+                  <p className="text-xs text-gray-500 font-bold tracking-wide">Complete your meal with a sweet note</p>
+                </div>
+              </div>
+              <button onClick={() => { setUpsellModalItem(null); setUpsellRecommendations([]); }} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <div className="p-5 bg-gray-50/50 space-y-4 max-h-[60vh] overflow-y-auto">
+              <h4 className="text-sm font-black text-gray-800 tracking-tight">You will love pairing it with</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {upsellRecommendations.map(recItem => (
+                  <div key={recItem.id} className="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    {recItem.imageUrl ? (
+                      <div className="w-full aspect-square rounded-xl overflow-hidden mb-3 bg-gray-100">
+                        <img src={recItem.imageUrl} alt={recItem.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 mb-3 flex items-center justify-center text-3xl">🍽️</div>
+                    )}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`w-3 h-3 rounded border flex items-center justify-center ${recItem.isVeg ? 'border-green-600 bg-green-50' : 'border-red-600 bg-red-50'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${recItem.isVeg ? 'bg-green-600' : 'bg-red-600'}`}></span>
+                          </span>
+                        </div>
+                        <h5 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2">{recItem.name}</h5>
+                        <p className="text-indigo-600 font-black text-sm mt-1">₹{recItem.price}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        handleItemAddClick(recItem, false, 'UPSELL', true);
+                      }}
+                      className="mt-3 w-full bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-100 font-bold text-xs py-2 rounded-xl transition-colors uppercase tracking-widest"
+                    >
+                      + ADD
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 bg-white border-t border-gray-100">
+               <button 
+                 onClick={() => { setUpsellModalItem(null); setUpsellRecommendations([]); }}
+                 className="w-full bg-green-600 hover:bg-green-700 active:scale-95 transition-transform text-white font-black py-4 rounded-xl shadow-lg shadow-green-600/30 text-lg tracking-tight flex items-center justify-center gap-2"
+               >
+                 Continue <span className="text-xl">›</span>
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zomato-Style Bill Summary & Gratitude Corner */}
+      {showBillSummary && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in pb-[76px]">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowBillSummary(false)}></div>
+          <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl relative z-10 animate-slide-up flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 rounded-t-3xl z-20 shadow-sm">
+              <h3 className="font-black text-xl text-gray-900 tracking-tight">Bill Summary</h3>
+              <button onClick={() => setShowBillSummary(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-6">
+               <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100 space-y-4">
+                 <div className="flex justify-between items-center font-bold text-gray-700">
+                   <span>Item Total</span>
+                   <span>${tableSession?.billing?.totals?.subtotal || '0.00'}</span>
+                 </div>
+                 <div className="flex justify-between items-center font-bold text-gray-700">
+                   <span>Taxes & Fees</span>
+                   <span>${tableSession?.billing?.totals?.tax || '0.00'}</span>
+                 </div>
+                 {tipAmount > 0 && (
+                   <div className="flex justify-between items-center font-bold text-emerald-600">
+                     <span>Tip Amount</span>
+                     <span>${tipAmount.toFixed(2)}</span>
+                   </div>
+                 )}
+                 <div className="border-t border-dashed border-blue-200 pt-4 flex justify-between items-center font-black text-xl text-gray-900">
+                   <span>Grand Total</span>
+                   <span>${(parseFloat(tableSession?.billing?.totals?.grandTotal || '0') + tipAmount).toFixed(2)}</span>
+                 </div>
+               </div>
+
+               <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 border border-indigo-100">
+                 <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 text-center">Gratitude Corner</h4>
+                 <div className="flex gap-4">
+                   <div className="w-14 h-14 bg-white shadow-sm rounded-full flex items-center justify-center text-2xl flex-shrink-0 border border-indigo-50">
+                     🙏
+                   </div>
+                   <div className="flex-1">
+                     <p className="text-sm font-bold text-indigo-950 mb-1">Tip your waiter</p>
+                     <p className="text-xs text-indigo-600/70 font-medium mb-4">100% of the tip goes directly to them</p>
+                     <div className="flex flex-wrap gap-2">
+                       {[20, 30, 50].map(amt => (
+                         <button 
+                           key={amt}
+                           onClick={() => setTipAmount(amt === tipAmount ? 0 : amt)}
+                           className={`px-4 py-2 rounded-xl font-bold text-sm border-2 transition-all ${tipAmount === amt ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200' : 'bg-white text-indigo-900 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'}`}
+                         >
+                           ₹{amt}
+                         </button>
+                       ))}
+                       <div className="relative flex-1 min-w-[80px]">
+                         <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-bold text-sm ${tipAmount > 0 && ![20, 30, 50].includes(tipAmount) ? 'text-indigo-600' : 'text-gray-400'}`}>₹</span>
+                         <input 
+                           type="number" 
+                           placeholder="Other" 
+                           value={tipAmount > 0 && ![20, 30, 50].includes(tipAmount) ? tipAmount : ''}
+                           onChange={(e) => setTipAmount(Number(e.target.value) || 0)}
+                           className={`w-full pl-7 pr-3 py-2 rounded-xl text-sm font-bold border-2 focus:outline-none transition-all ${tipAmount > 0 && ![20, 30, 50].includes(tipAmount) ? 'bg-indigo-50 border-indigo-600 text-indigo-900 shadow-md shadow-indigo-100' : 'bg-white border-indigo-100 text-gray-900 focus:border-indigo-300 focus:bg-indigo-50'}`}
+                         />
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+               
+               <button 
+                 onClick={() => setShowBillSummary(false)}
+                 className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-transform text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-600/30 text-lg tracking-tight"
+               >
+                 Done
+               </button>
+            </div>
+          </div>
         </div>
       )}
 

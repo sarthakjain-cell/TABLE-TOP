@@ -17,11 +17,13 @@ interface PaySplitBody {
   customerPhone?: string;
   paymentMethod?: string;
   items: SplitPaymentItem[];
+  tipAmount?: number;
 }
 
 interface CheckoutCartBody {
   customerName?: string;
   customerPhone?: string;
+  tipAmount?: number;
 }
 
 interface PayCustomAmountBody {
@@ -457,7 +459,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   // Pay for a custom split selection of items from the shared cart
   fastify.post<{ Params: { sessionId: string }; Body: PaySplitBody }>('/api/sessions/:sessionId/pay-split', async (request, reply) => {
     const { sessionId } = request.params;
-    const { items, customerName, customerPhone, paymentMethod } = request.body;
+    const { items, customerName, customerPhone, paymentMethod, tipAmount } = request.body;
 
     if (!items || !items.length) {
       return reply.code(400).send({ error: 'Selected items list cannot be empty' });
@@ -537,7 +539,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         });
       }
 
-      const totalGrand = transactionSubtotal.add(transactionTax).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const tipDecimal = new Decimal(tipAmount || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const totalGrand = transactionSubtotal.add(transactionTax).add(tipDecimal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
       // Initialize Razorpay
       const razorpay = new Razorpay({
@@ -564,6 +567,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           razorpayOrderId: razorpayOrder.id,
           customerName,
           customerPhone,
+          tipAmount: tipDecimal,
           paymentItems: {
             create: transactionItemsPayload.map(item => ({
               orderItemId: item.orderItemId,
@@ -743,7 +747,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   // Hotel Mode Cart Checkout
   fastify.post<{ Params: { sessionId: string }; Body: CheckoutCartBody }>('/api/sessions/:sessionId/checkout-cart', async (request, reply) => {
     const { sessionId } = request.params;
-    const { customerName, customerPhone } = request.body;
+    const { customerName, customerPhone, tipAmount } = request.body;
 
     try {
       const session = await prisma.session.findUnique({
@@ -798,7 +802,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           });
         }
 
-        const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        const tipDecimal = new Decimal(tipAmount || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).add(tipDecimal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
         // Transition order state from PENDING to NEW using an atomic update to prevent TOCTOU Race Conditions
         const updateResult = await tx.order.updateMany({
@@ -828,6 +833,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             status: 'COMPLETED',
             customerName,
             customerPhone,
+            tipAmount: tipDecimal,
             deliveryFeeApplied: roomServiceFee,
             paymentItems: {
               create: transactionItemsPayload

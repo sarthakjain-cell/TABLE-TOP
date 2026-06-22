@@ -41,15 +41,21 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       let totalDeliveryFees = new Decimal(0);
       let totalCash = new Decimal(0);
       let totalOnline = new Decimal(0);
+      let totalTips = new Decimal(0);
 
       const flatTransactions = transactions.map(tx => {
-        totalRevenue = totalRevenue.add(new Decimal(tx.amount.toString()));
+        const txAmount = new Decimal(tx.amount.toString());
+        const txTip = new Decimal(tx.tipAmount?.toString() || '0');
+        const coreRevenue = txAmount.sub(txTip);
+
+        totalRevenue = totalRevenue.add(coreRevenue);
         totalDeliveryFees = totalDeliveryFees.add(new Decimal(tx.deliveryFeeApplied.toString()));
+        totalTips = totalTips.add(txTip);
 
         if (tx.paymentMethod === 'CASH') {
-          totalCash = totalCash.add(new Decimal(tx.amount.toString()));
+          totalCash = totalCash.add(coreRevenue);
         } else if (tx.paymentMethod === 'ONLINE' || tx.paymentMethod === 'UPI') {
-          totalOnline = totalOnline.add(new Decimal(tx.amount.toString()));
+          totalOnline = totalOnline.add(coreRevenue);
         }
 
         return {
@@ -57,6 +63,7 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           amount: tx.amount,
           taxPaid: tx.taxPaid,
           deliveryFeeApplied: tx.deliveryFeeApplied,
+          tipAmount: tx.tipAmount,
           customerName: tx.customerName,
           customerPhone: tx.customerPhone,
           paymentMethod: tx.paymentMethod || 'UNKNOWN',
@@ -80,6 +87,7 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           totalDeliveryFees: totalDeliveryFees.toFixed(2),
           totalCash: totalCash.toFixed(2),
           totalOnline: totalOnline.toFixed(2),
+          totalTips: totalTips.toFixed(2),
           totalOrders
         },
         transactions: flatTransactions
