@@ -261,7 +261,6 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [showBillSummary, setShowBillSummary] = useState(false);
   const [upsellModalItem, setUpsellModalItem] = useState<any>(null);
-  const [upsellRecommendations, setUpsellRecommendations] = useState<any[]>([]);
   const [cartRecommendationTab, setCartRecommendationTab] = useState<string>('Popular');
   const [isVegOnly, setIsVegOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
