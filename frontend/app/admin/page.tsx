@@ -271,7 +271,6 @@ export default function AdminPage() {
       const res = await fetch(`/api/transactions/${transactionId}/verify`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}` 
         }
       });
