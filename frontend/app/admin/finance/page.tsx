@@ -100,7 +100,7 @@ export default function FinanceDashboard() {
           <button onClick={() => router.push('/admin')} className={navItemClass}>
             <LayoutDashboard size={18} /> Floor Plan
           </button>
-          <button onClick={() => router.push('/admin')} className={navItemClass}>
+          <button onClick={() => router.push('/admin?tab=menu')} className={navItemClass}>
             <Utensils size={18} /> Menu Editor
           </button>
           <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-blue-600 text-white shadow-md">

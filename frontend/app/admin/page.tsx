@@ -90,6 +90,15 @@ export default function AdminPage() {
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger' | 'settings'>('dashboard');
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'menu' || tabParam === 'dashboard' || tabParam === 'settings') {
+        setActiveTab(tabParam as any);
+      }
+    }
+  }, []);
   const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
