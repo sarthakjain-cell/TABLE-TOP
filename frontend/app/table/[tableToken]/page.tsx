@@ -518,8 +518,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const remaining = grandTotal - totalAllocated;
 
   const executeCheckout = async (paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'ROOM') => {
-    if (!customerName.trim() || !customerPhone.trim()) {
-      alert("Please enter your Name and Phone Number to proceed.");
+    if (!customerName.trim()) {
+      alert("Please enter your Name to proceed.");
+      return;
+    }
+    if (!/^\d{10}$/.test(customerPhone.trim())) {
+      alert("Please enter a valid 10-digit Phone Number to proceed.");
       return;
     }
     
