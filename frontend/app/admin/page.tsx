@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useRouter } from 'next/navigation';
 import ModifierBuilder from './ModifierBuilder';
 import { LayoutDashboard, Folder, FolderPlus, ArrowLeft, Utensils, IndianRupee, Bell, Plus, Trash2, Download, Lock, CheckCircle2, TrendingUp, Calendar, Building2, Landmark, Receipt, UploadCloud, Loader2, X, Settings } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface OrderItem {
   orderedQuantity: number;
@@ -997,6 +998,41 @@ export default function AdminPage() {
   };
 
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  const chartData = React.useMemo(() => {
+    const daily: Record<string, number> = {};
+    transactions.forEach(tx => {
+      const date = new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      daily[date] = (daily[date] || 0) + parseFloat(tx.amount || '0');
+    });
+    return Object.entries(daily).map(([date, revenue]) => ({ date, revenue }));
+  }, [transactions]);
+
+  const downloadCSV = () => {
+    if (transactions.length === 0) {
+      alert("No transactions to export.");
+      return;
+    }
+    const headers = ['ID', 'Date', 'Amount', 'Tax', 'Customer Name', 'Customer Phone'];
+    const rows = transactions.map(tx => [
+      tx.id,
+      new Date(tx.createdAt).toLocaleString(),
+      tx.amount,
+      tx.taxPaid,
+      tx.customerName || 'N/A',
+      tx.customerPhone || 'N/A'
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `ledger_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   return (
     <div className="flex min-h-screen bg-gray-100 font-sans">
