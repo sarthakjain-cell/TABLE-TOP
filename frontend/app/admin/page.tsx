@@ -999,9 +999,14 @@ export default function AdminPage() {
 
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+
+
   const chartData = React.useMemo(() => {
     const daily: Record<string, number> = {};
-    transactions.forEach(tx => {
+    (transactions || []).forEach(tx => {
+      if (!tx || !tx.createdAt) return;
       const date = new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       daily[date] = (daily[date] || 0) + parseFloat(tx.amount || '0');
     });
