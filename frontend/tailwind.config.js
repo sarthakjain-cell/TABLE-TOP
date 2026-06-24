@@ -21,6 +21,7 @@ module.exports = {
       animation: {
         'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
         'pop': 'pop 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        'shimmer': 'shimmer 2s infinite linear',
       },
       keyframes: {
         slideUp: {
@@ -31,6 +32,10 @@ module.exports = {
           '0%': { transform: 'scale(0.95)' },
           '50%': { transform: 'scale(1.02)' },
           '100%': { transform: 'scale(1)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-1000px 0' },
+          '100%': { backgroundPosition: '1000px 0' },
         }
       }
     },

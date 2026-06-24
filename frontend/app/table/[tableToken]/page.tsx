@@ -6,6 +6,8 @@ import { decimalMath } from '../../../utils/decimalMath';
 import nextDynamic from 'next/dynamic';
 import Script from 'next/script';
 import { CheckCircle, Users, Menu, X, ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 const QRCodeSVG = nextDynamic(() => import('qrcode.react').then((mod) => mod.QRCodeSVG), {
   ssr: false,
@@ -138,15 +140,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             {item.isAvailable ? (
               item.hasHalfPortion ? (
                 <div className="flex gap-2">
-                  <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD FULL</button>
-                  <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD HALF</button>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD FULL</motion.button>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD HALF</motion.button>
                   {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                     <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-brand-primary font-bold text-[10px] uppercase ml-1 flex flex-col items-center justify-center btn-tactile"><span>⚙️</span><span>Modify</span></button>
                   )}
                 </div>
               ) : (
                 <div className="flex flex-col items-start">
-                  <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile">ADD</button>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile">ADD</motion.button>
                   {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                     <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-gray-400 text-[10px] mt-1 font-semibold text-center w-[75px]">Customizable</button>
                   )}
@@ -168,12 +170,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           {item.isAvailable ? (
             item.hasHalfPortion ? (
               <div className="absolute -bottom-3 flex gap-1 justify-center w-full px-2">
-                <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">FULL</button>
-                <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">HALF</button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">FULL</motion.button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">HALF</motion.button>
               </div>
             ) : (
               <div className="absolute -bottom-4 w-full flex flex-col items-center">
-                <button onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100">ADD</button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100">ADD</motion.button>
                 {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                   <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-gray-400 text-[9px] mt-1 font-semibold text-center z-10 bg-white/90 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">Customizable</button>
                 )}
@@ -519,11 +521,11 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
 
   const executeCheckout = async (paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'ROOM') => {
     if (!customerName.trim()) {
-      alert("Please enter your Name to proceed.");
+      toast.error("Please enter your Name to proceed.");
       return;
     }
     if (!/^\d{10}$/.test(customerPhone.trim())) {
-      alert("Please enter a valid 10-digit Phone Number to proceed.");
+      toast.error("Please enter a valid 10-digit Phone Number to proceed.");
       return;
     }
     
@@ -554,7 +556,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         addDebugLog('Payload Items Length: ' + payloadItems.length);
         if (payloadItems.length === 0) {
           addDebugLog('payloadItems is EMPTY! Session orders: ' + JSON.stringify(tableSession?.orders));
-          alert("Order is synchronizing with the kitchen. Please wait 2 seconds and click Pay again.");
+          toast.error("Order is synchronizing. Please wait a moment and try again.");
           setPaymentProcessing(false);
           return;
         }
@@ -644,7 +646,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
               setCheckoutMode('SUCCESS');
             } catch (err: any) {
                addDebugLog('Verification error: ' + err.message);
-               alert('Payment successful but verification failed: ' + err.message);
+               toast.error("Payment successful but verification failed: " + err.message);
             } finally {
                setPaymentProcessing(false);
             }
@@ -1766,7 +1768,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                           
                           socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
                         } catch (err: any) {
-                          alert('Payment successful but verification failed: ' + err.message);
+                          toast.error("Payment successful but verification failed: " + err.message);
                         } finally {
                           setLocalClaimedSplitId(null);
                           setPaymentProcessing(false);

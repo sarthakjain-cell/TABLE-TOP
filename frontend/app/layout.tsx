@@ -3,6 +3,7 @@ import { SocketProvider } from '../context/SocketContext';
 import React from 'react';
 import { Inter } from 'next/font/google';
 import Script from 'next/script';
+import { Toaster } from 'react-hot-toast';
 
 // Next.js will optimize this font and serve it instantly
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
@@ -30,6 +31,7 @@ export default function RootLayout({
         <SocketProvider>
           {children}
         </SocketProvider>
+        <Toaster position="bottom-center" />
         
         {/* lazyOnload means: Wait until the browser is completely idle before loading this */}
         <Script 
