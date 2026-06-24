@@ -30,6 +30,7 @@ interface PayCustomAmountBody {
   customerName?: string;
   customerPhone?: string;
   amountToPay: number;
+  tipAmount?: number;
 }
 
 export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -265,8 +266,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         const updatedPaidQuantityMap = new Map<string, any>();
         allCompletedTxs.forEach(ctx => {
           ctx.paymentItems.forEach(pi => {
-            const currentPaid = updatedPaidQuantityMap.get(pi.orderItemId) || new (require('decimal.js').Decimal)(0);
-            updatedPaidQuantityMap.set(pi.orderItemId, currentPaid.add(new (require('decimal.js').Decimal)(pi.quantityPaid.toString())));
+            const currentPaid = updatedPaidQuantityMap.get(pi.orderItemId) || new Decimal(0);
+            updatedPaidQuantityMap.set(pi.orderItemId, currentPaid.add(new Decimal(pi.quantityPaid.toString())));
           });
         });
 
@@ -274,9 +275,10 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         session.orders.forEach(order => {
           if (order.status === 'PENDING') return;
           order.items.forEach(item => {
-            const qtyPaid = updatedPaidQuantityMap.get(item.id) || new (require('decimal.js').Decimal)(0);
-            const qtyOrdered = new (require('decimal.js').Decimal)(item.quantity.toString());
-            if (qtyPaid.lt(qtyOrdered)) {
+            const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
+            const qtyOrdered = new Decimal(item.quantity.toString());
+            // Tolerate floating point math discrepancies up to 0.001
+            if (qtyOrdered.sub(qtyPaid).gt(0.001)) {
               isFullyPaid = false;
             }
           });
@@ -480,6 +482,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
 
       const taxRate = new Decimal(session.table.restaurant.taxRate.toString());
+      const isHotel = session.table.restaurant.establishmentType === 'HOTEL';
+      const roomServiceFee = isHotel ? new Decimal(session.table.restaurant.roomServiceFee.toString()) : new Decimal(0);
 
       // Track paid item quantities using Decimal
       const paidQuantityMap = new Map<string, Decimal>();
@@ -540,7 +544,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
 
       const tipDecimal = new Decimal(tipAmount || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-      const totalGrand = transactionSubtotal.add(transactionTax).add(tipDecimal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).add(tipDecimal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
       // Initialize Razorpay
       const razorpay = new Razorpay({
@@ -568,6 +572,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           customerName,
           customerPhone,
           tipAmount: tipDecimal,
+          deliveryFeeApplied: roomServiceFee,
           paymentItems: {
             create: transactionItemsPayload.map(item => ({
               orderItemId: item.orderItemId,
@@ -605,7 +610,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   // Hotel Mode Cart Checkout (processes payment, applies delivery fee, and transitions PENDING cart to NEW order)
     fastify.post<{ Params: { sessionId: string }; Body: PayCustomAmountBody }>('/api/sessions/:sessionId/pay-custom-amount', async (request, reply) => {
     const { sessionId } = request.params;
-    const { amountToPay, customerName, customerPhone } = request.body;
+    const { amountToPay, customerName, customerPhone, tipAmount } = request.body;
 
     if (!amountToPay || amountToPay <= 0) {
       return reply.code(400).send({ error: 'Invalid payment amount' });
@@ -626,6 +631,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
 
       const taxRate = new Decimal(session.table.restaurant.taxRate.toString());
+      const isHotel = session.table.restaurant.establishmentType === 'HOTEL';
+      const roomServiceFee = isHotel ? new Decimal(session.table.restaurant.roomServiceFee.toString()) : new Decimal(0);
 
       // Track paid item quantities
       const paidQuantityMap = new Map<string, Decimal>();
@@ -691,6 +698,9 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
          return reply.code(400).send({ error: 'No unpaid items remaining to allocate payment to' });
       }
 
+      const tipDecimal = new Decimal(tipAmount || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const totalGrand = new Decimal(amountToPay.toString()).add(roomServiceFee).add(tipDecimal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
       // Initialize Razorpay
       const razorpay = new Razorpay({
         key_id: 'rzp_live_Szz1d4E7cQBqbS',
@@ -698,7 +708,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
 
       // Create Razorpay Order
-      const amountInPaise = Math.round(Number(amountToPay) * 100);
+      const amountInPaise = Math.round(totalGrand.toNumber() * 100);
       const razorpayOrder = await razorpay.orders.create({
         amount: amountInPaise,
         currency: "INR",
@@ -709,13 +719,15 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       const transaction = await prisma.transaction.create({
         data: {
           sessionId,
-          amount: new Decimal(amountToPay.toString()),
+          amount: totalGrand,
           taxPaid: totalTaxAllocated.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
           status: 'PENDING',
           paymentMethod: 'ONLINE',
           razorpayOrderId: razorpayOrder.id,
           customerName,
           customerPhone,
+          tipAmount: tipDecimal,
+          deliveryFeeApplied: roomServiceFee,
           paymentItems: {
             create: transactionItemsPayload.map(item => ({
               orderItemId: item.orderItemId,
@@ -885,12 +897,13 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     paymentMethod: 'UPI' | 'CASH';
     customerName?: string;
     customerPhone?: string;
+    tipAmount?: number;
   }
 
   // Direct checkout (Zero-Fee UPI or Cash to Waiter)
   fastify.post<{ Params: { sessionId: string }; Body: CheckoutDirectBody }>('/api/sessions/:sessionId/checkout-direct', async (request, reply) => {
     const { sessionId } = request.params;
-    const { paymentMethod, customerName, customerPhone } = request.body;
+    const { paymentMethod, customerName, customerPhone, tipAmount } = request.body;
 
     if (paymentMethod !== 'UPI' && paymentMethod !== 'CASH') {
       return reply.code(400).send({ error: 'Invalid payment method' });
@@ -942,7 +955,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           });
         }
 
-        const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        const tipDecimal = new Decimal(tipAmount || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        const totalGrand = transactionSubtotal.add(transactionTax).add(roomServiceFee).add(tipDecimal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
         // Transition order state to PAYMENT_PENDING
         const updatedOrder = await tx.order.update({
@@ -964,6 +978,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             paymentMethod: paymentMethod,
             customerName,
             customerPhone,
+            tipAmount: tipDecimal,
             deliveryFeeApplied: roomServiceFee,
             paymentItems: {
               create: transactionItemsPayload
@@ -1237,7 +1252,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
               order.items.forEach(item => {
                 const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
                 const qtyOrdered = new Decimal(item.quantity.toString());
-                if (qtyPaid.lt(qtyOrdered)) {
+                // Tolerate floating point math discrepancies up to 0.001
+                if (qtyOrdered.sub(qtyPaid).gt(0.001)) {
                   isFullyPaid = false;
                 }
               });

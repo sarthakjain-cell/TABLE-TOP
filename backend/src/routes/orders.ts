@@ -60,9 +60,13 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
               if (!dbItem.isAvailable) {
                 throw new Error(`MenuItem ${dbItem.name} is currently out of stock ("86ed")`);
               }
+              const qty = new Decimal(item.quantity.toString());
+              if (qty.lte(0)) {
+                throw new Error(`Quantity for ${dbItem.name} must be greater than zero`);
+              }
               return {
                 menuItemId: item.menuItemId,
-                quantity: new Decimal(item.quantity.toString()),
+                quantity: qty,
                 price: dbItem.price,
                 modifications: item.modifications || []
               };
@@ -223,7 +227,15 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       // If the order was PAYMENT_PENDING and is now transitioning forward, finalize its PENDING transaction
       if (order.status === 'PAYMENT_PENDING' && status !== 'PAYMENT_PENDING') {
         const pendingTx = await prisma.transaction.findFirst({
-          where: { sessionId: order.sessionId, status: 'PENDING' }
+          where: { 
+            sessionId: order.sessionId, 
+            status: 'PENDING',
+            paymentItems: {
+              some: {
+                orderItem: { orderId: order.id }
+              }
+            }
+          }
         });
         if (pendingTx) {
           await prisma.transaction.update({

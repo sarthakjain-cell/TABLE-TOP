@@ -406,6 +406,9 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
               }
               const basePrice = isHalfPortion && menuItem.halfPrice ? menuItem.halfPrice : menuItem.price;
               let modifierPriceAdd = 0;
+              const validModifications: string[] = []; // Store only verified modifications
+              if (isHalfPortion) validModifications.push('Half Portion');
+              
               if (menuItem.modifierGroups && modifications) {
                 try {
                   const groups = typeof menuItem.modifierGroups === 'string' ? JSON.parse(menuItem.modifierGroups) : menuItem.modifierGroups;
@@ -414,8 +417,9 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
                       for (const group of groups) {
                         if (Array.isArray(group.options)) {
                           for (const option of group.options) {
-                            if (modifications.includes(option.name) && option.price) {
-                              modifierPriceAdd += Number(option.price);
+                            if (modifications.includes(option.name)) {
+                              validModifications.push(option.name);
+                              if (option.price) modifierPriceAdd += Number(option.price);
                             }
                           }
                         }
@@ -423,8 +427,9 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
                     } else {
                       // Flat array of modifier tags
                       for (const mod of groups) {
-                        if (modifications.includes(mod.name) && mod.price) {
-                          modifierPriceAdd += Number(mod.price);
+                        if (modifications.includes(mod.name)) {
+                          validModifications.push(mod.name);
+                          if (mod.price) modifierPriceAdd += Number(mod.price);
                         }
                       }
                     }
@@ -439,7 +444,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
                   menuItemId,
                   quantity: qtyToAdd,
                   price: itemPrice,
-                  modifications: modifications || [],
+                  modifications: validModifications,
                   addedVia: addedVia || 'MANUAL'
                 }
               });
@@ -510,10 +515,18 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
           const isPrePay = pendingOrder.session.table.restaurant.paymentMode === 'PRE_PAY';
           const targetStatus = isPrePay ? 'PAYMENT_PENDING' : 'NEW';
 
-          // Transition order state
-          const updatedOrder = await tx.order.update({
+          // Transition order state atomically to prevent double submit race conditions
+          const updateResult = await tx.order.updateMany({
+            where: { id: pendingOrder.id, status: 'PENDING' },
+            data: { status: targetStatus }
+          });
+
+          if (updateResult.count === 0) {
+            throw new Error('CONCURRENCY_ERROR: Cart was already submitted.');
+          }
+
+          const updatedOrder = await tx.order.findUniqueOrThrow({
             where: { id: pendingOrder.id },
-            data: { status: targetStatus },
             include: {
               items: {
                 include: {
@@ -569,6 +582,11 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
 
         if (callback) callback({ success: true });
       } catch (err: any) {
+        if (err.message && err.message.includes('CONCURRENCY_ERROR')) {
+          fastify.log.warn('Ignored concurrent submitCart request');
+          if (callback) callback({ success: true }); // Prevent showing error to the second racing tap
+          return;
+        }
         fastify.log.error(err);
         socket.emit('error', { message: err.message });
         if (callback) callback({ success: false, error: err.message });
