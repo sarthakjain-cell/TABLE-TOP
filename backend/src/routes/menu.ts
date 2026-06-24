@@ -316,9 +316,12 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       }
 
       const cacheKey = 'menu_' + table.restaurantId;
+      const orderCountsCacheKey = 'orderCounts_' + table.restaurantId;
+      
       let items: any[] | undefined = menuCache.get(cacheKey);
+      let countsMap: Map<string, number> | undefined = menuCache.get(orderCountsCacheKey);
 
-      if (items) {
+      if (items && countsMap) {
         reply.header('X-Cache', 'HIT');
       } else {
         reply.header('X-Cache', 'MISS');
@@ -327,21 +330,24 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
           where: { restaurantId: table.restaurantId },
           orderBy: { name: 'asc' },
         });
+        
+        // Fetch historical order counts for 'Highly Ordered' sorting and AI recommendations
+        const orderCounts = await prisma.orderItem.groupBy({
+          by: ['menuItemId'],
+          _sum: { quantity: true },
+          where: { order: { session: { restaurantId: table.restaurantId } } }
+        });
+        
+        countsMap = new Map(orderCounts.map(oc => [oc.menuItemId, Number(oc._sum.quantity)]));
+        
         menuCache.set(cacheKey, items);
+        menuCache.set(orderCountsCacheKey, countsMap);
       }
-      
-      // Fetch historical order counts for 'Highly Ordered' sorting and AI recommendations
-      const orderCounts = await prisma.orderItem.groupBy({
-        by: ['menuItemId'],
-        _sum: { quantity: true },
-        where: { order: { session: { restaurantId: table.restaurantId } } }
-      });
-      const countsMap = new Map(orderCounts.map(oc => [oc.menuItemId, Number(oc._sum.quantity)]));
       
       // Filter the master list to only serve available items to the table, and attach orderCount
       return items.filter(item => item.isAvailable).map(item => ({
         ...item,
-        orderCount: countsMap.get(item.id) || 0
+        orderCount: countsMap!.get(item.id) || 0
       }));
     } catch (error) {
       fastify.log.error(error);
