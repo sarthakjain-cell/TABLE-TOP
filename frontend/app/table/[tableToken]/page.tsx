@@ -513,8 +513,8 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const isCartCheckout = isHotel && cartSubtotal > 0;
   
   const grandTotal = isCartCheckout 
-    ? cartSubtotal + roomServiceFee 
-    : (subtotalGrand > 0 ? subtotalGrand + roomServiceFee : 0);
+    ? cartSubtotal + roomServiceFee + (tipAmount || 0)
+    : (subtotalGrand > 0 ? subtotalGrand + roomServiceFee + (tipAmount || 0) : 0);
   
   const totalAllocated = contributors.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
   const remaining = grandTotal - totalAllocated;
