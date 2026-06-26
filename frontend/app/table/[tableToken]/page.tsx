@@ -1411,7 +1411,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                      <span className="text-6xl">💰</span>
                    </div>
                    <p className="text-blue-800 font-bold mb-2 uppercase tracking-widest text-xs relative z-10">Total Remaining Balance</p>
-                   <p className="text-6xl font-black text-blue-600 tabular-nums tracking-tighter relative z-10">${tableSession?.billing?.remaining?.grandTotal || '0.00'}</p>
+                   <p className="text-6xl font-black text-blue-600 tabular-nums tracking-tighter relative z-10">${(parseFloat(tableSession?.billing?.remaining?.grandTotal || '0') + tipAmount).toFixed(2)}</p>
                    {(() => {
                      let calcBaseItemsTotal = 0;
                      let calcCustomizationsTotal = 0;
@@ -1460,6 +1460,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                              <span>Taxes (GST)</span>
                              <span>${tableSession?.billing?.totals?.tax || '0.00'}</span>
                            </div>
+                           {tipAmount > 0 && (
+                             <div className="flex justify-between font-bold text-emerald-600">
+                               <span>Tip Added</span>
+                               <span>${tipAmount.toFixed(2)}</span>
+                             </div>
+                           )}
                          </div>
                        );
                      }
