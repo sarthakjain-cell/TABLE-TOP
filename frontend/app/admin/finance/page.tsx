@@ -308,7 +308,7 @@ export default function FinanceDashboard() {
                         ${Number(tx.deliveryFeeApplied).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <a href={`/receipt/${tx.id}`} target="_blank" rel="noopener noreferrer" className="text-xs font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors inline-block">
+                        <a href={`/receipt/${tx.id}?admin=true`} target="_blank" rel="noopener noreferrer" className="text-xs font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors inline-block">
                           📄 View
                         </a>
                       </td>
