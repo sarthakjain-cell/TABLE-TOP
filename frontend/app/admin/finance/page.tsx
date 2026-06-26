@@ -195,7 +195,7 @@ export default function FinanceDashboard() {
           </div>
 
           {/* Metric Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex items-center gap-6 relative overflow-hidden group">
               <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                 <IndianRupee className="text-emerald-600" size={32} />
