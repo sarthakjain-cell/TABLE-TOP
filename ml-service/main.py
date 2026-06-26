@@ -24,6 +24,8 @@ def train_model(restaurant_id: str):
     JOIN "Order" o ON s.id = o."sessionId"
     JOIN "OrderItem" oi ON o.id = oi."orderId"
     WHERE s."restaurantId" = :rest_id
+      AND o.status = 'COMPLETED'
+      AND s."createdAt" >= NOW() - INTERVAL '30 days'
     """)
     
     try:
@@ -93,8 +95,9 @@ def train_model(restaurant_id: str):
             for pair in itertools.combinations(sorted(list(basket)), 2):
                 pair_counts[pair] += 1
                 
-        min_support_count = max(total_baskets * 0.01, 2)
-        min_confidence = 0.1
+        min_support_count = max(total_baskets * 0.02, 2)
+        min_confidence = 0.3
+        min_lift = 1.2
         
         for pair, count in pair_counts.items():
             if count < min_support_count:
@@ -105,13 +108,13 @@ def train_model(restaurant_id: str):
             # Rule: A -> B
             conf_a_b = count / item_counts[item_a]
             lift_a_b = conf_a_b / (item_counts[item_b] / total_baskets)
-            if conf_a_b >= min_confidence:
+            if conf_a_b >= min_confidence and lift_a_b > min_lift:
                 all_rules.append((item_a, item_b, conf_a_b, lift_a_b, time_context))
                 
             # Rule: B -> A
             conf_b_a = count / item_counts[item_b]
             lift_b_a = conf_b_a / (item_counts[item_a] / total_baskets)
-            if conf_b_a >= min_confidence:
+            if conf_b_a >= min_confidence and lift_b_a > min_lift:
                 all_rules.append((item_b, item_a, conf_b_a, lift_b_a, time_context))
                 
     if not all_rules:

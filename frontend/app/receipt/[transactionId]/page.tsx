@@ -248,16 +248,22 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
             <div className="bg-slate-50 rounded-2xl p-5 space-y-3 border border-gray-100">
               <div className="flex justify-between text-sm text-gray-500 font-bold">
                 <span>Subtotal</span>
-                <span>${(parseFloat(transaction.amount) - parseFloat(transaction.taxPaid) - parseFloat(transaction.deliveryFeeApplied)).toFixed(2)}</span>
+                <span>${(parseFloat(transaction.amount) - parseFloat(transaction.taxPaid) - parseFloat(transaction.deliveryFeeApplied || '0') - parseFloat(transaction.tipAmount || '0')).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-500 font-bold">
                 <span>Tax ({transaction.session.table.restaurant.taxRate}%)</span>
                 <span>${parseFloat(transaction.taxPaid).toFixed(2)}</span>
               </div>
-              {parseFloat(transaction.deliveryFeeApplied) > 0 && (
+              {parseFloat(transaction.deliveryFeeApplied || '0') > 0 && (
                 <div className="flex justify-between text-sm text-gray-500 font-bold">
                   <span>Room Service Fee</span>
                   <span>${parseFloat(transaction.deliveryFeeApplied).toFixed(2)}</span>
+                </div>
+              )}
+              {parseFloat(transaction.tipAmount || '0') > 0 && (
+                <div className="flex justify-between text-sm text-gray-500 font-bold">
+                  <span>Tip (Gratitude)</span>
+                  <span>${parseFloat(transaction.tipAmount).toFixed(2)}</span>
                 </div>
               )}
               

@@ -189,7 +189,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     </div>
   );
 
-  const handleItemAddClick = (item: MenuItem, isHalf: boolean = false, addedVia?: string, skipUpsell: boolean = false) => {
+  const handleItemAddClick = async (item: MenuItem, isHalf: boolean = false, addedVia?: string, skipUpsell: boolean = false) => {
     try {
       const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups;
       if (Array.isArray(g) && g.length > 0) {
@@ -206,23 +206,18 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     handleOptimisticAdd(item.id, 1, isHalf ? ['Half Portion'] : [], addedVia);
 
     if (!skipUpsell) {
-      // Find recommendation rules where this item is the antecedent
-      const itemRules = restaurant?.recommendationRules?.filter((r: any) => r.antecedentId === item.id) || [];
-      if (itemRules.length > 0) {
-        // Sort by confidence/lift to get top 3
-        const recIds = itemRules
-          .sort((a: any, b: any) => b.confidence - a.confidence)
-          .map((r: any) => r.consequentId);
-          
-        const recItems = recIds
-          .map((id: string) => menuItems.find(m => m.id === id))
-          .filter((m: any) => m && m.isAvailable)
-          .slice(0, 4);
-          
-        if (recItems.length > 0) {
-          setUpsellModalItem(item);
-          setUpsellRecommendations(recItems);
+      try {
+        const restId = restaurant?.id || tableToken.split('-')[0];
+        const res = await fetch(`/api/restaurants/${restId}/recommendations/${item.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            setUpsellModalItem(item);
+            setUpsellRecommendations(data.items);
+          }
         }
+      } catch (err) {
+        console.error("Failed to fetch hybrid recommendations", err);
       }
     }
   };
@@ -2187,7 +2182,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     </div>
                     <button 
                       onClick={() => {
-                        handleItemAddClick(recItem, false, 'UPSELL', true);
+                        handleItemAddClick(recItem, false, 'ML_UPSELL', true);
                       }}
                       className="mt-3 w-full bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-100 font-bold text-xs py-2 rounded-xl transition-colors uppercase tracking-widest"
                     >

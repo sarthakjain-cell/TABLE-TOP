@@ -91,6 +91,19 @@ export default function AdminPage() {
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'menu' | 'ledger' | 'settings'>('dashboard');
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+
+  const chartData = React.useMemo(() => {
+    const daily: Record<string, number> = {};
+    (transactions || []).forEach(tx => {
+      if (!tx || !tx.createdAt) return;
+      const date = new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      daily[date] = (daily[date] || 0) + parseFloat(tx.amount || '0');
+    });
+    return Object.entries(daily).map(([date, revenue]) => ({ date, revenue }));
+  }, [transactions]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -998,20 +1011,6 @@ export default function AdminPage() {
   };
 
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => setIsMounted(true), []);
-
-
-  const chartData = React.useMemo(() => {
-    const daily: Record<string, number> = {};
-    (transactions || []).forEach(tx => {
-      if (!tx || !tx.createdAt) return;
-      const date = new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      daily[date] = (daily[date] || 0) + parseFloat(tx.amount || '0');
-    });
-    return Object.entries(daily).map(([date, revenue]) => ({ date, revenue }));
-  }, [transactions]);
 
   const downloadCSV = () => {
     if (transactions.length === 0) {

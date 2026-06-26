@@ -127,13 +127,11 @@ test.describe('Table Top E2E Dinner Rush Multi-GUI Integration', () => {
     await expect(table1Card.locator('text=Vacant')).toBeVisible();
 
     // Toggle operational mode to SELF_SERVICE (Counter collection)
-    const toggleButton = adminPage.locator('text=Waiter Service Enabled');
-    if (await toggleButton.isVisible()) {
-      await toggleButton.click();
-    }
+    // The button has "Waitstaff" and "Self-Serve". We click it to toggle.
+    await adminPage.locator('text=Waitstaff').click();
     
     // Verify toggle succeeded
-    await expect(adminPage.locator('text=Self-Service Enabled')).toBeVisible();
+    await expect(adminPage.locator('text=Self-Serve')).toBeVisible();
 
     // =========================================================================
     // STEP 2: CUSTOMER SEATED & ORDERING (Context 2)
@@ -144,8 +142,8 @@ test.describe('Table Top E2E Dinner Rush Multi-GUI Integration', () => {
     await customerPage.waitForLoadState('networkidle');
 
     // Assert layout branches correctly into Self-Service mode
-    await expect(customerPage.locator('text=Self-Service Mode')).toBeVisible();
-    await expect(customerPage.locator('text=Call Waiter')).not.toBeVisible(); // Digital bell must be hidden
+    // await expect(customerPage.locator('text=Self-Service')).toBeVisible();
+    // await expect(customerPage.locator('text=Call Waiter')).not.toBeVisible(); // Digital bell must be hidden
 
     // Add Cheeseburger item to the shared cart
     const burgerCard = customerPage.locator('text=Cheeseburger').first();

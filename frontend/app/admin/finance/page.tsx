@@ -9,7 +9,7 @@ import { LayoutDashboard, Utensils, IndianRupee, Lock, Calendar, TrendingUp, Rec
 export default function FinanceDashboard() {
   const router = useRouter();
   const { authToken, setAuthToken } = useSocket();
-  const [metrics, setMetrics] = useState({ totalRevenue: '0.00', totalOrders: 0, totalDeliveryFees: '0.00', totalCash: '0.00', totalOnline: '0.00' });
+  const [metrics, setMetrics] = useState<any>({ totalRevenue: '0.00', totalOrders: 0, totalDeliveryFees: '0.00', totalCash: '0.00', totalOnline: '0.00', totalMlRevenue: '0.00' });
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -195,7 +195,7 @@ export default function FinanceDashboard() {
           </div>
 
           {/* Metric Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex items-center gap-6 relative overflow-hidden group">
               <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                 <IndianRupee className="text-emerald-600" size={32} />
@@ -243,6 +243,16 @@ export default function FinanceDashboard() {
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Del. Profit</p>
                 <p className="text-3xl font-black text-purple-600 tabular-nums">${metrics.totalDeliveryFees}</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex items-center gap-6 relative overflow-hidden group">
+              <div className="w-16 h-16 rounded-2xl bg-fuchsia-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <TrendingUp className="text-fuchsia-600" size={32} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">AI Upsell</p>
+                <p className="text-3xl font-black text-fuchsia-600 tabular-nums">${metrics.totalMlRevenue || '0.00'}</p>
               </div>
             </div>
           </div>

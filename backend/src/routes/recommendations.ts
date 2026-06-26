@@ -3,12 +3,21 @@ import { prisma } from '../prisma';
 
 export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
-  // GET /api/restaurants/:restaurantId/recommendations
-  fastify.get('/api/restaurants/:restaurantId/recommendations', async (request, reply) => {
-    const { restaurantId } = request.params as { restaurantId: string };
+  // GET /api/restaurants/:restaurantId/recommendations/:itemId
+  fastify.get('/api/restaurants/:restaurantId/recommendations/:itemId', async (request, reply) => {
+    const { restaurantId, itemId } = request.params as { restaurantId: string, itemId: string };
     
     try {
-      // Determine current time context bucket based on server time
+      // 1. Fetch the ordered item to check its category
+      const orderedItem = await prisma.menuItem.findUnique({
+        where: { id: itemId }
+      });
+      
+      if (!orderedItem) return reply.code(404).send({ error: "Item not found" });
+
+      const isBeverage = orderedItem.category.toLowerCase().includes('beverage') || orderedItem.category.toLowerCase().includes('drink');
+      const isSide = orderedItem.category.toLowerCase().includes('side') || orderedItem.category.toLowerCase().includes('dip');
+
       const hour = new Date().getHours();
       let currentContext = 'ALL';
       if (hour >= 5 && hour < 12) currentContext = 'MORNING';
@@ -16,77 +25,68 @@ export const recommendationRoutes: FastifyPluginAsync = async (fastify: FastifyI
       else if (hour >= 17 && hour < 22) currentContext = 'EVENING';
       else currentContext = 'NIGHT';
 
-      // 1. Try fetching rules for the specific time context
-      let rules = await prisma.recommendationRule.findMany({
-        where: { restaurantId, timeContext: currentContext },
-        orderBy: [
-          { lift: 'desc' },
-          { confidence: 'desc' }
-        ],
-        include: { consequent: true }
-      });
+      // 2. Fetch everything concurrently using Promise.all to prevent Database Bottleneck
+      const [mlRulesContext, mlRulesFallback, beverages, dips, newItems, lowVelocity] = await Promise.all([
+        prisma.recommendationRule.findMany({
+          where: { restaurantId, antecedentId: itemId, timeContext: currentContext },
+          orderBy: [{ lift: 'desc' }, { confidence: 'desc' }],
+          include: { consequent: true },
+          take: 3
+        }),
+        prisma.recommendationRule.findMany({
+          where: { restaurantId, antecedentId: itemId, timeContext: 'ALL' },
+          orderBy: [{ lift: 'desc' }, { confidence: 'desc' }],
+          include: { consequent: true },
+          take: 3
+        }),
+        isBeverage ? Promise.resolve([]) : prisma.menuItem.findMany({
+          where: { restaurantId, isAvailable: true, OR: [{ category: { contains: 'Beverage', mode: 'insensitive' } }, { category: { contains: 'Drink', mode: 'insensitive' } }] },
+          take: 2
+        }),
+        isSide ? Promise.resolve([]) : prisma.menuItem.findMany({
+          where: { restaurantId, isAvailable: true, OR: [{ category: { contains: 'Side', mode: 'insensitive' } }, { category: { contains: 'Dip', mode: 'insensitive' } }] },
+          take: 2
+        }),
+        prisma.menuItem.findMany({
+          where: { restaurantId, isAvailable: true },
+          orderBy: { createdAt: 'desc' },
+          take: 2
+        }),
+        prisma.menuItem.findMany({
+          where: { restaurantId, isAvailable: true },
+          orderBy: { price: 'asc' },
+          take: 2
+        })
+      ]);
 
-      // 2. Anti-Sparsity Fallback: If no rules in this specific time bucket, fallback to 'ALL'
-      if (rules.length === 0 && currentContext !== 'ALL') {
-        rules = await prisma.recommendationRule.findMany({
-          where: { restaurantId, timeContext: 'ALL' },
-          orderBy: [
-            { lift: 'desc' },
-            { confidence: 'desc' }
-          ],
-          include: { consequent: true }
-        });
-      }
+      let synthesizedItems = [];
 
-      // --- COLD START FALLBACK ---
-      if (rules.length === 0) {
-        // Fetch all menu items for this restaurant
-        const allMenuItems = await prisma.menuItem.findMany({ 
-          where: { restaurantId, isAvailable: true } 
-        });
-        
-        // Find top 3 cheap sides/beverages/desserts for impulse buys
-        let fallbackItems = allMenuItems
-          .filter(item => 
-            item.category.toLowerCase().includes('side') || 
-            item.category.toLowerCase().includes('beverage') || 
-            item.category.toLowerCase().includes('drink') ||
-            item.category.toLowerCase().includes('add') ||
-            item.category.toLowerCase().includes('dessert') ||
-            parseFloat(item.price as unknown as string) <= 6.0
-          )
-          .sort((a, b) => parseFloat(a.price as unknown as string) - parseFloat(b.price as unknown as string))
-          .slice(0, 3);
-          
-        // If the menu is expensive and doesn't have these specific categories, just take the 3 absolute cheapest items
-        if (fallbackItems.length === 0 && allMenuItems.length > 0) {
-           fallbackItems = [...allMenuItems]
-             .sort((a, b) => parseFloat(a.price as unknown as string) - parseFloat(b.price as unknown as string))
-             .slice(0, 3);
-        }
-          
-        if (fallbackItems.length > 0) {
-          // Generate fake rules mapping every menu item to these fallback items
-          rules = allMenuItems.flatMap(item => 
-            fallbackItems
-              .filter(fb => fb.id !== item.id) // Don't recommend the item itself
-              .map(fb => ({
-                id: `fallback-${item.id}-${fb.id}`,
-                antecedentId: item.id,
-                consequentId: fb.id,
-                confidence: 0.99,
-                lift: 2.0,
-                restaurantId,
-                createdAt: new Date(),
-                consequent: fb
-              }))
-          ) as any;
+      // Add ML Rules (try specific time context first, then ALL fallback)
+      let mlRules = mlRulesContext.length > 0 ? mlRulesContext : mlRulesFallback;
+      synthesizedItems.push(...mlRules.map(r => r.consequent));
+
+      // Add category heuristics
+      synthesizedItems.push(...beverages);
+      synthesizedItems.push(...dips);
+      synthesizedItems.push(...newItems);
+      synthesizedItems.push(...lowVelocity);
+
+      // Deduplicate and filter out the ordered item itself
+      const uniqueItemsMap = new Map();
+      for (const item of synthesizedItems) {
+        if (item.id !== itemId && !uniqueItemsMap.has(item.id)) {
+          uniqueItemsMap.set(item.id, item);
         }
       }
+      
+      const uniqueItems = Array.from(uniqueItemsMap.values());
 
-      return reply.send(rules);
+      // Slice to prevent Cognitive Overload (max 8 items)
+      const finalPayload = uniqueItems.slice(0, 8);
+
+      return reply.send({ items: finalPayload });
     } catch (err: any) {
-      console.error("Error fetching recommendations:", err);
+      console.error("Error fetching hybrid recommendations:", err);
       return reply.code(500).send({ error: err.message });
     }
   });

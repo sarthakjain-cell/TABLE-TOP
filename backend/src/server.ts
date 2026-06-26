@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { createServer } from 'http';
 import { initSocketIO } from './socket';
+import { startMlTrainerCron } from './workers/mlTrainer';
 
 import { restaurantRoutes } from './routes/restaurants';
 import { tableRoutes } from './routes/tables';
@@ -78,6 +79,7 @@ const start = async () => {
     });
 
     await fastify.ready();
+    startMlTrainerCron();
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`Server successfully started on port ${PORT}`);
   } catch (err) {
