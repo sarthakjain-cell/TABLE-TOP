@@ -60,7 +60,7 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
         return {
           id: tx.id,
-          amount: tx.amount,
+          amount: coreRevenue.toString(),
           taxPaid: tx.taxPaid,
           deliveryFeeApplied: tx.deliveryFeeApplied,
           tipAmount: tx.tipAmount,

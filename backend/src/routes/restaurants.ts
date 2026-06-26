@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { Decimal } from 'decimal.js';
 import { prisma } from '../prisma';
 import { getIO } from '../socket';
 import { requireRole } from '../middleware/auth';
@@ -125,7 +126,15 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
         orderBy: { createdAt: 'desc' },
         take: 50
       });
-      return transactions;
+
+      return transactions.map(tx => {
+        const amt = new Decimal(tx.amount?.toString() || '0');
+        const tip = new Decimal(tx.tipAmount?.toString() || '0');
+        return {
+          ...tx,
+          amount: amt.sub(tip).toNumber()
+        };
+      });
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to fetch transactions' });
