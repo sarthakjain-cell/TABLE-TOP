@@ -81,27 +81,28 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         }
       });
 
-      // Calculate ML Upsell Revenue
-      const mlItems = await prisma.orderItem.findMany({
+      // Calculate ML Upsell Revenue based on actual payments
+      const mlPayments = await prisma.orderItemPayment.findMany({
         where: {
-          addedVia: 'ML_UPSELL',
-          order: {
+          transaction: {
             status: 'COMPLETED',
             session: {
               restaurantId: request.user!.restaurantId
             },
             ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
+          },
+          orderItem: {
+            addedVia: 'ML_UPSELL'
           }
         },
         select: {
-          price: true,
-          quantity: true
+          amount: true
         }
       });
       
       let totalMlRevenue = new Decimal(0);
-      for (const item of mlItems) {
-        totalMlRevenue = totalMlRevenue.add(new Decimal(item.price.toString()).mul(new Decimal(item.quantity.toString())));
+      for (const payment of mlPayments) {
+        totalMlRevenue = totalMlRevenue.add(new Decimal(payment.amount.toString()));
       }
 
       return reply.code(200).send({
