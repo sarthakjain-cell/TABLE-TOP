@@ -241,8 +241,9 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
   });
 
-  fastify.post<{ Params: { id: string } }>('/api/transactions/:id/verify', async (request, reply) => {
+  fastify.post<{ Params: { id: string }; Body: { paymentMethod?: string } }>('/api/transactions/:id/verify', async (request, reply) => {
     try {
+      const { paymentMethod } = request.body || {};
       const transaction = await prisma.transaction.findUnique({
         where: { id: request.params.id },
         include: { session: { include: { table: { include: { restaurant: true } }, orders: { include: { items: { include: { menuItem: true } } } } } }, paymentItems: true }
@@ -254,7 +255,10 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       await prisma.$transaction(async (tx) => {
         await tx.transaction.update({
           where: { id: transaction.id },
-          data: { status: 'COMPLETED' }
+          data: { 
+            status: 'COMPLETED',
+            ...(paymentMethod && { paymentMethod })
+          }
         });
 
         const session = transaction.session;
@@ -757,9 +761,9 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
 
   // Hotel Mode Cart Checkout
-  fastify.post<{ Params: { sessionId: string }; Body: CheckoutCartBody }>('/api/sessions/:sessionId/checkout-cart', async (request, reply) => {
+  fastify.post<{ Params: { sessionId: string }; Body: CheckoutCartBody & { paymentMethod?: string } }>('/api/sessions/:sessionId/checkout-cart', async (request, reply) => {
     const { sessionId } = request.params;
-    const { customerName, customerPhone, tipAmount } = request.body;
+    const { customerName, customerPhone, tipAmount, paymentMethod } = request.body;
 
     try {
       const session = await prisma.session.findUnique({
@@ -843,6 +847,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             amount: totalGrand,
             taxPaid: transactionTax.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
             status: 'COMPLETED',
+            paymentMethod,
             customerName,
             customerPhone,
             tipAmount: tipDecimal,
