@@ -92,7 +92,7 @@ export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter })
           },
           orderItem: {
-            addedVia: 'ML_UPSELL'
+            addedVia: { in: ['ML_UPSELL', 'ML_WIDGET'] }
           }
         },
         select: {
