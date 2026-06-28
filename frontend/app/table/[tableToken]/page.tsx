@@ -50,8 +50,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [checkoutMode, setCheckoutMode] = useState<'IDLE' | 'CHOICE' | 'PAY_FULL' | 'SPLIT' | 'CHARGE_ROOM' | 'WAITING_WAITER' | 'SUCCESS'>('IDLE');
   const [showBellModal, setShowBellModal] = useState(false);
   const [showPickupAlert, setShowPickupAlert] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  
+  // Debug logs removed from UI
   // Optimistic UI state for cart quantities
   const [itemBeingCustomized, setItemBeingCustomized] = useState<MenuItem | null>(null);
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
@@ -239,8 +238,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   };
   
   const addDebugLog = (msg: string) => {
-    console.log(msg);
-    setDebugLogs(prev => [...prev, new Date().toLocaleTimeString() + ': ' + msg]);
+    console.log('[Checkout Debug]', msg);
   };
   
   // Splitwise style contributors state
@@ -1355,12 +1353,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">How would you like to pay?</h2>
                     <p className="text-gray-500 text-sm mt-2 font-medium">Choose a payment method for this table.</p>
                   </div>
-                  {debugLogs.length > 0 && (
-                    <div className="bg-black text-green-400 p-4 rounded-xl text-xs font-mono overflow-auto max-h-40">
-                      <strong>DEBUG LOGS:</strong>
-                      {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
-                    </div>
-                  )}
+
                   <div className="space-y-4">
                     <button
                       onClick={() => setCheckoutMode('PAY_FULL')}
@@ -1400,12 +1393,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                 <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
                   <span>💳</span> Full Checkout
                 </h2>
-                {debugLogs.length > 0 && (
-                  <div className="bg-black text-green-400 p-4 rounded-xl text-xs font-mono overflow-auto max-h-40">
-                    <strong>DEBUG LOGS:</strong>
-                    {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
-                  </div>
-                )}
+
                 <div className="bg-blue-50 border border-blue-100 rounded-[2rem] p-8 shadow-sm text-center relative overflow-hidden">
                    <div className="absolute top-0 right-0 p-4 opacity-10">
                      <span className="text-6xl">💰</span>
