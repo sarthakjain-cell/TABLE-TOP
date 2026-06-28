@@ -1076,7 +1076,7 @@ export default function AdminPage() {
           {(userRole === 'MANAGER' || userRole === 'SUPER_ADMIN') && (
             <>
               <button
-                onClick={() => router.push('/admin/finance')}
+                onClick={() => setActiveTab('ledger')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === 'ledger' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
