@@ -13,7 +13,7 @@ interface UpdateStatusBody {
 
 export const tableRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Create a new table and generate its secure QR token (Admin protected)
-  fastify.post<{ Body: CreateTableBody }>('/api/tables', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.post<{ Body: CreateTableBody }>('/api/tables', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { number } = request.body;
     const restaurantId = request.user!.restaurantId;
 
@@ -145,7 +145,7 @@ export const tableRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   fastify.post('/api/tables/verify', verifyTokenHandler);
 
   // Explicitly update table status (Vacant / Occupied)
-  fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/tables/:id/status', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
+  fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/tables/:id/status', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN', 'WAITER', 'KITCHEN']) }, async (request, reply) => {
     const { id } = request.params;
     const { status } = request.body;
     const restaurantId = request.user!.restaurantId;
@@ -172,7 +172,7 @@ export const tableRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   });
 
   // Delete a table
-  fastify.delete<{ Params: { id: string } }>('/api/tables/:id', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.delete<{ Params: { id: string } }>('/api/tables/:id', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
 
     try {

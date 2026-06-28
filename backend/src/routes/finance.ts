@@ -4,7 +4,7 @@ import { requireRole } from '../middleware/auth';
 import { Decimal } from 'decimal.js';
 
 export const financeRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  fastify.get<{ Querystring: { startDate?: string; endDate?: string } }>('/api/finance/metrics', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.get<{ Querystring: { startDate?: string; endDate?: string } }>('/api/finance/metrics', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { startDate, endDate } = request.query;
     
     try {

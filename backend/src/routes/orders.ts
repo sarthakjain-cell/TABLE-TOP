@@ -110,7 +110,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   });
 
   // Get active orders for a restaurant (primarily for kitchen displaying tickets)
-  fastify.get<{ Querystring: { restaurantId: string } }>('/api/orders/active', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
+  fastify.get<{ Querystring: { restaurantId: string } }>('/api/orders/active', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN', 'WAITER', 'KITCHEN']) }, async (request, reply) => {
     const { restaurantId } = request.query;
 
     if (!restaurantId) {
@@ -184,7 +184,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   }
 
   // Update order status (Kitchen Line interactions)
-  fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/orders/:id/status', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
+  fastify.patch<{ Params: { id: string }; Body: UpdateStatusBody }>('/api/orders/:id/status', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN', 'WAITER', 'KITCHEN']) }, async (request, reply) => {
     const { id } = request.params;
     const { status } = request.body;
 
@@ -289,7 +289,7 @@ export const orderRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   });
 
   // Toggle individual dish delivery status
-  fastify.patch<{ Params: { id: string }; Body: { isServed: boolean } }>('/api/order-items/:id/served', { preHandler: requireRole(['ADMIN', 'KITCHEN']) }, async (request, reply) => {
+  fastify.patch<{ Params: { id: string }; Body: { isServed: boolean } }>('/api/order-items/:id/served', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN', 'WAITER', 'KITCHEN']) }, async (request, reply) => {
     const { id } = request.params;
     const { isServed } = request.body;
 

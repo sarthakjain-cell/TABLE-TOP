@@ -52,6 +52,8 @@ model Restaurant {
   id              String          @id @default(uuid())
   name              String
   passcodeHash      String?
+  waiterPasscodeHash String?
+  kitchenPasscodeHash String?
   operationalMode   OperationalMode   @default(FULL_SERVICE)
   paymentMode       PaymentCollectionMode @default(POST_PAY)
   establishmentType EstablishmentType @default(RESTAURANT)

@@ -12,6 +12,12 @@ export const metadata = {
   description: 'Collaborative QR-code restaurant management system',
 };
 
+// CRITICAL FIX: This entirely disables Vercel's static caching across the whole app.
+// Since this is a live POS system, caching causes bugs (old menus, missing orders).
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 export default function RootLayout({
   children,
 }: {

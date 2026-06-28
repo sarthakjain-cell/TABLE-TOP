@@ -45,7 +45,7 @@ const imageUrlSchema = {
 export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Create Menu Item (Admin protected)
   fastify.post<{ Body: CreateMenuItemBody }>('/api/menu', { 
-    preHandler: requireRole(['ADMIN']),
+    preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']),
     schema: {
       body: {
         type: 'object',
@@ -138,7 +138,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // Update Menu Item (Admin protected)
   fastify.patch<{ Params: { id: string }; Body: UpdateMenuItemBody }>('/api/menu/:id', { 
-    preHandler: requireRole(['ADMIN']),
+    preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']),
     schema: {
       params: {
         type: 'object',
@@ -207,7 +207,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // Toggle Availability ("86" item) (Kitchen & Admin protected)
   fastify.patch<{ Params: { id: string }; Body: ToggleAvailabilityBody }>('/api/menu/:id/availability', { 
-    preHandler: requireRole(['ADMIN', 'KITCHEN']),
+    preHandler: requireRole(['MANAGER', 'SUPER_ADMIN', 'WAITER', 'KITCHEN']),
     schema: {
       params: {
         type: 'object',
@@ -251,7 +251,7 @@ export const menuRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // Delete Menu Item (Admin protected)
   fastify.delete<{ Params: { id: string } }>('/api/menu/:id', { 
-    preHandler: requireRole(['ADMIN']),
+    preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']),
     schema: {
       params: {
         type: 'object',

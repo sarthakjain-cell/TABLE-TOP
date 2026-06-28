@@ -10,7 +10,7 @@ cloudinary.v2.config({
 });
 
 const uploadRoutes: FastifyPluginAsync = async (fastify, opts) => {
-  fastify.post('/api/upload', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.post('/api/upload', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     try {
       const data = await request.file();
       if (!data) {

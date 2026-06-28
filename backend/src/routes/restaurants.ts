@@ -40,7 +40,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   });
 
   // Create a new restaurant
-  fastify.post<{ Body: RestaurantBody }>('/api/restaurants', async (request, reply) => {
+  fastify.post<{ Body: RestaurantBody }>('/api/restaurants', { preHandler: requireRole(['SUPER_ADMIN']) }, async (request, reply) => {
     const { name, taxRate } = request.body;
     
     try {
@@ -57,14 +57,38 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
     }
   });
 
-  // Get all restaurants (for auto-linking in dev/prototype)
-  fastify.get('/api/restaurants', async (request, reply) => {
+  // Get all restaurants (Super Admin only)
+  fastify.get('/api/restaurants', { preHandler: requireRole(['SUPER_ADMIN']) }, async (request, reply) => {
     try {
       const restaurants = await prisma.restaurant.findMany();
       return restaurants;
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to fetch restaurants' });
+    }
+  });
+
+  // Update Passcodes (Super Admin only)
+  fastify.patch<{ Params: { id: string }; Body: { type: 'MANAGER' | 'WAITER' | 'KITCHEN'; passcode: string } }>('/api/restaurants/:id/passcode', { preHandler: requireRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { id } = request.params;
+    const { type, passcode } = request.body;
+    
+    try {
+      const bcrypt = require('bcrypt');
+      const hash = await bcrypt.hash(passcode, 10);
+      let data: any = {};
+      if (type === 'MANAGER') data.passcodeHash = hash;
+      else if (type === 'WAITER') data.waiterPasscodeHash = hash;
+      else if (type === 'KITCHEN') data.kitchenPasscodeHash = hash;
+
+      const restaurant = await prisma.restaurant.update({
+        where: { id },
+        data
+      });
+      return reply.send({ success: true });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to update passcode' });
     }
   });
 
@@ -108,7 +132,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   });
 
   // Fetch recent completed transactions for ledger
-  fastify.get<{ Params: { id: string } }>('/api/restaurants/:id/transactions', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>('/api/restaurants/:id/transactions', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
     
     if (request.user!.restaurantId !== id) {
@@ -142,7 +166,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   });
 
   // Toggle/Update Operational Mode (Admin protected)
-  fastify.patch<{ Params: { id: string }; Body: UpdateModeBody }>('/api/restaurants/:id/mode', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.patch<{ Params: { id: string }; Body: UpdateModeBody }>('/api/restaurants/:id/mode', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
     const { mode } = request.body;
 
@@ -173,7 +197,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
   });
 
   // Update Settings (Establishment Type & Delivery Fee)
-  fastify.patch<{ Params: { id: string }; Body: UpdateSettingsBody }>('/api/restaurants/:id/settings', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.patch<{ Params: { id: string }; Body: UpdateSettingsBody }>('/api/restaurants/:id/settings', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
     const { establishmentType, paymentMode, roomServiceFee, upiId, merchantName, logoUrl } = request.body;
 
@@ -226,7 +250,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
     }
   });
   // Calculate AI ROI
-  fastify.get<{ Params: { id: string } }>('/api/restaurants/:id/ai-roi', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>('/api/restaurants/:id/ai-roi', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { id } = request.params;
     
     try {

@@ -68,7 +68,7 @@ interface Transaction {
 
 export default function AdminPage() {
   const router = useRouter();
-  const { isConnected, socket, authToken, setAuthToken } = useSocket();
+  const { isConnected, socket, authToken, setAuthToken, userRole } = useSocket();
   const [restaurantId, setRestaurantId] = useState<string>('');
   const [restaurantName, setRestaurantName] = useState('');
   const [allRestaurants, setAllRestaurants] = useState<{id: string, name: string}[]>([]);
@@ -952,7 +952,7 @@ export default function AdminPage() {
                 const data = await res.json();
                 if (res.ok && data.token) {
                   localStorage.setItem('tabletop_restaurant_id', data.restaurant.id);
-                  setAuthToken(data.token);
+                  setAuthToken(data.token, data.role);
                 } else {
                   setLoginError(data.error || 'Authentication failed');
                 }
@@ -1061,30 +1061,38 @@ export default function AdminPage() {
           >
             <LayoutDashboard size={18} /> {establishmentType === 'HOTEL' ? 'Room Management' : 'Floor Plan'}
           </button>
-          <button
-            onClick={() => setActiveTab('menu')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'menu' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Utensils size={18} /> Menu Editor
-          </button>
-          <button
-            onClick={() => router.push('/admin/finance')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'ledger' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <IndianRupee size={18} /> Financials
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'settings' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Settings size={18} /> Settings
-          </button>
+          
+          {(userRole === 'MANAGER' || userRole === 'SUPER_ADMIN' || userRole === 'WAITER') && (
+            <button
+              onClick={() => setActiveTab('menu')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'menu' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Utensils size={18} /> Menu Editor
+            </button>
+          )}
+
+          {(userRole === 'MANAGER' || userRole === 'SUPER_ADMIN') && (
+            <>
+              <button
+                onClick={() => router.push('/admin/finance')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'ledger' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <IndianRupee size={18} /> Financials
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'settings' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <Settings size={18} /> Settings
+              </button>
+            </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-800 mt-auto">

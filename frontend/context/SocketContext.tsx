@@ -53,7 +53,8 @@ interface SocketContextType {
   submitCart: () => Promise<{ success: boolean; error?: string }>;
   requestHelp: (requestType: string) => void;
   authToken: string | null;
-  setAuthToken: (token: string | null) => void;
+  setAuthToken: (token: string | null, role?: string | null) => void;
+  userRole: string | null;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -80,12 +81,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const sessionParams = useRef<{ tableId: string; sessionId: string } | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
+  const [userRole, setUserRoleState] = useState<string | null>(null);
+
   // Expose function to store auth headers for RBAC API routes (e.g. Admin/Kitchen dashboards)
-  const setAuthToken = (token: string | null) => {
+  const setAuthToken = (token: string | null, role?: string | null) => {
     setAuthTokenState(token);
+    if (role !== undefined) setUserRoleState(role);
     if (typeof window !== 'undefined') {
       if (token) {
         localStorage.setItem('tabletop_auth_token', token);
+        if (role) localStorage.setItem('tabletop_user_role', role);
         document.cookie = `tabletop_auth_token=${token}; path=/; max-age=86400; SameSite=Strict; Secure`;
         try {
           const raw = atob(token.replace(/-/g, '+').replace(/_/g, '/'));
@@ -94,12 +99,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (payload.restaurantId) {
              localStorage.setItem('tabletop_restaurant_id', payload.restaurantId);
           }
+          if (!role && payload.role) {
+             setUserRoleState(payload.role);
+             localStorage.setItem('tabletop_user_role', payload.role);
+          }
         } catch (e) {
           console.error('Failed to decode token restaurantId', e);
         }
       } else {
         localStorage.removeItem('tabletop_auth_token');
         localStorage.removeItem('tabletop_restaurant_id');
+        localStorage.removeItem('tabletop_user_role');
+        setUserRoleState(null);
         document.cookie = 'tabletop_auth_token=; path=/; max-age=0; SameSite=Strict; Secure';
       }
     }
@@ -111,6 +122,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const savedToken = localStorage.getItem('tabletop_auth_token');
       if (savedToken && hasCookie) {
         setAuthTokenState(savedToken);
+        const savedRole = localStorage.getItem('tabletop_user_role');
+        if (savedRole) setUserRoleState(savedRole);
         try {
           const raw = atob(savedToken.replace(/-/g, '+').replace(/_/g, '/'));
           const parsed = JSON.parse(raw);
@@ -118,12 +131,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (payload.restaurantId) {
              localStorage.setItem('tabletop_restaurant_id', payload.restaurantId);
           }
+          if (!savedRole && payload.role) {
+             setUserRoleState(payload.role);
+             localStorage.setItem('tabletop_user_role', payload.role);
+          }
         } catch (e) {
           console.error('Failed to decode token restaurantId', e);
         }
       } else if (savedToken && !hasCookie) {
         localStorage.removeItem('tabletop_auth_token');
         localStorage.removeItem('tabletop_restaurant_id');
+        localStorage.removeItem('tabletop_user_role');
       }
     }
 
@@ -321,6 +339,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         requestHelp,
         authToken,
         setAuthToken,
+        userRole,
       }}
     >
       {children}

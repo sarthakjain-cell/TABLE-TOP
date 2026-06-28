@@ -12,7 +12,7 @@ declare module 'fastify' {
     };
     user?: {
       userId: string;
-      role: 'ADMIN' | 'KITCHEN';
+      role: 'SUPER_ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN';
       restaurantId: string;
     };
   }
@@ -65,10 +65,10 @@ export async function verifyTableSession(request: FastifyRequest, reply: Fastify
 }
 
 /**
- * Fastify preHandler hook to require specific user roles (ADMIN, KITCHEN).
+ * Fastify preHandler hook to require specific user roles.
  * Parses "Bearer <token>" from Authorization header.
  */
-export function requireRole(allowedRoles: ('ADMIN' | 'KITCHEN')[]) {
+export function requireRole(allowedRoles: ('SUPER_ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN')[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const authHeader = request.headers['authorization'];
     
@@ -83,10 +83,10 @@ export function requireRole(allowedRoles: ('ADMIN' | 'KITCHEN')[]) {
       return reply.code(401).send({ error: 'Invalid or expired authentication token' });
     }
 
-    if (!allowedRoles.includes(decoded.role)) {
+    if (!allowedRoles.includes(decoded.role as any)) {
       return reply.code(403).send({ error: 'Forbidden: Insufficient privileges' });
     }
 
-    request.user = decoded;
+    request.user = decoded as any;
   };
 }

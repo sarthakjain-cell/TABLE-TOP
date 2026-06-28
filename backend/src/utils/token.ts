@@ -58,7 +58,7 @@ export function verifyTableToken(token: string): DecodedTableToken | null {
 
 export interface UserAuthPayload {
   userId: string;
-  role: 'ADMIN' | 'KITCHEN';
+  role: 'SUPER_ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN';
   restaurantId: string;
   createdAt: number;
 }
@@ -66,7 +66,7 @@ export interface UserAuthPayload {
 /**
  * Encodes and signs user auth payload containing Role-Based Access and Tenant Isolation details.
  */
-export function signUserToken(userId: string, role: 'ADMIN' | 'KITCHEN', restaurantId: string): string {
+export function signUserToken(userId: string, role: 'SUPER_ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN', restaurantId: string): string {
   const payloadStr = JSON.stringify({
     userId,
     role,

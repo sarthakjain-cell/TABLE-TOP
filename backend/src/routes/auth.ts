@@ -17,6 +17,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     try {
+      if (restaurantId === 'SUPER' && passcode === process.env.SUPER_ADMIN_PASSCODE) {
+        const token = signUserToken('super-admin', 'SUPER_ADMIN', 'ALL');
+        return reply.send({ token, role: 'SUPER_ADMIN', restaurant: { id: 'ALL', name: 'Super Admin' } });
+      }
+
       const restaurant = await prisma.restaurant.findUnique({
         where: { id: restaurantId }
       });
@@ -25,23 +30,35 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         return reply.code(404).send({ error: 'Restaurant not found.' });
       }
 
-      if (!restaurant.passcodeHash) {
-        // For development/migration fallback if no passcode is set
-        if (passcode !== '0000') {
-           return reply.code(401).send({ error: 'Invalid passcode.' });
-        }
+      let assignedRole: 'MANAGER' | 'WAITER' | 'KITCHEN' | null = null;
+
+      // Fallback for development if no passcode is set
+      if (!restaurant.passcodeHash && passcode === '0000') {
+          assignedRole = 'MANAGER';
       } else {
-        const isValid = await bcrypt.compare(passcode, restaurant.passcodeHash);
-        if (!isValid) {
-          return reply.code(401).send({ error: 'Invalid passcode.' });
+        // Check Manager Passcode
+        if (restaurant.passcodeHash && await bcrypt.compare(passcode, restaurant.passcodeHash)) {
+          assignedRole = 'MANAGER';
+        }
+        // Check Waiter Passcode
+        else if (restaurant.waiterPasscodeHash && await bcrypt.compare(passcode, restaurant.waiterPasscodeHash)) {
+          assignedRole = 'WAITER';
+        }
+        // Check Kitchen Passcode
+        else if (restaurant.kitchenPasscodeHash && await bcrypt.compare(passcode, restaurant.kitchenPasscodeHash)) {
+          assignedRole = 'KITCHEN';
         }
       }
 
-      // We consider anyone logging into the restaurant dashboard an ADMIN for now
-      const token = signUserToken('admin-user', 'ADMIN', restaurant.id);
+      if (!assignedRole) {
+        return reply.code(401).send({ error: 'Invalid passcode.' });
+      }
+
+      const token = signUserToken(`${assignedRole.toLowerCase()}-user`, assignedRole, restaurant.id);
 
       return reply.send({
         token,
+        role: assignedRole,
         restaurant: {
           id: restaurant.id,
           name: restaurant.name

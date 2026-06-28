@@ -36,7 +36,7 @@ interface PayCustomAmountBody {
 export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   // Admin forced Cash Collection and Session Close
-  fastify.post<{ Params: { sessionId: string } }>('/api/sessions/:sessionId/admin-collect-cash', { preHandler: requireRole(['ADMIN']) }, async (request, reply) => {
+  fastify.post<{ Params: { sessionId: string } }>('/api/sessions/:sessionId/admin-collect-cash', { preHandler: requireRole(['MANAGER', 'SUPER_ADMIN']) }, async (request, reply) => {
     const { sessionId } = request.params;
     
     try {
