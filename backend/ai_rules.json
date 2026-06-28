@@ -1,0 +1,51 @@
+[
+  {
+    "antecedent": "Lacha Paratha",
+    "consequent": "Gobi Pakora",
+    "confidence": 0.85,
+    "lift": 2.1,
+    "timeContext": "ALL"
+  },
+  {
+    "antecedent": "Lacha Paratha",
+    "consequent": "Lamb Samosa",
+    "confidence": 0.65,
+    "lift": 1.5,
+    "timeContext": "ALL"
+  },
+  {
+    "antecedent": "Gobi Pakora",
+    "consequent": "Alu Mater Samosa",
+    "confidence": 0.9,
+    "lift": 3.2,
+    "timeContext": "ALL"
+  },
+  {
+    "antecedent": "Lamb Samosa",
+    "consequent": "Palak Paneer",
+    "confidence": 0.45,
+    "lift": 1.2,
+    "timeContext": "ALL"
+  },
+  {
+    "antecedent": "Palak Paneer",
+    "consequent": "Gobi Pakora",
+    "confidence": 0.75,
+    "lift": 2.8,
+    "timeContext": "ALL"
+  },
+  {
+    "antecedent": "Alu Mater Samosa",
+    "consequent": "Gobi Pakora",
+    "confidence": 0.88,
+    "lift": 3,
+    "timeContext": "ALL"
+  },
+  {
+    "antecedent": "Kadai Paneer",
+    "consequent": "Dal Makhni",
+    "confidence": 0.6,
+    "lift": 1.8,
+    "timeContext": "ALL"
+  }
+]
