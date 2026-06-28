@@ -44,7 +44,7 @@ export default function SuperAdminPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId: 'SUPER', passcode: loginPasscode })
+        body: JSON.stringify({ restaurantId: 'SUPER', passcode: loginPasscode.trim() })
       });
       const data = await res.json();
       if (res.ok && data.token) {
