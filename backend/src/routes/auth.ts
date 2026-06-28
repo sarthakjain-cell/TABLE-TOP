@@ -17,8 +17,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     try {
-      // Accept either the Railway environment variable OR a hardcoded fallback to bypass deployment issues
-      if (restaurantId === 'SUPER' && (passcode === process.env.SUPER_ADMIN_PASSCODE || passcode === 'SARTHAKJAIN01')) {
+      if (restaurantId === 'SUPER' && passcode === process.env.SUPER_ADMIN_PASSCODE) {
         const token = signUserToken('super-admin', 'SUPER_ADMIN', 'ALL');
         return reply.send({ token, role: 'SUPER_ADMIN', restaurant: { id: 'ALL', name: 'Super Admin' } });
       }
