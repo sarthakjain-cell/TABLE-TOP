@@ -179,7 +179,13 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         }
       });
 
-      if (transaction) return transaction;
+      if (transaction) {
+        if (transaction.customerPhone) {
+          // Mask phone number to prevent PII leak on capability URL
+          transaction.customerPhone = transaction.customerPhone.slice(0, 3) + '****' + transaction.customerPhone.slice(-3);
+        }
+        return transaction;
+      }
 
       // Fallback: Check if the ID is an Order ID (for Pre-Payment Bills)
       const order = await prisma.order.findUnique({
@@ -281,8 +287,8 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           order.items.forEach(item => {
             const qtyPaid = updatedPaidQuantityMap.get(item.id) || new Decimal(0);
             const qtyOrdered = new Decimal(item.quantity.toString());
-            // Tolerate floating point math discrepancies up to 0.001
-            if (qtyOrdered.sub(qtyPaid).gt(0.001)) {
+            // Tolerate floating point math discrepancies up to 0.05 to prevent sticky 0.01 INR balances
+            if (qtyOrdered.sub(qtyPaid).gt(0.05)) {
               isFullyPaid = false;
             }
           });
@@ -523,6 +529,10 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         const orderedQty = new Decimal(orderItem.quantity.toString());
         const availableQty = orderedQty.sub(paidQty);
         const reqQtyToPay = new Decimal(reqItem.quantityToPay.toString());
+
+        if (reqQtyToPay.lte(0)) {
+          return reply.code(400).send({ error: 'Quantity to pay must be greater than zero' });
+        }
 
         if (reqQtyToPay.gt(availableQty)) {
           return reply.code(400).send({
@@ -784,6 +794,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       const result = await prisma.$transaction(async (tx) => {
         const pendingOrder = await tx.order.findFirst({
           where: { sessionId, status: 'PENDING' },
+          orderBy: { createdAt: 'asc' },
           include: {
             items: { include: { menuItem: true } }
           }
@@ -929,6 +940,7 @@ export const billingRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       const result = await prisma.$transaction(async (tx) => {
         const pendingOrder = await tx.order.findFirst({
           where: { sessionId, status: 'PENDING' },
+          orderBy: { createdAt: 'asc' },
           include: { items: { include: { menuItem: true } } }
         });
 

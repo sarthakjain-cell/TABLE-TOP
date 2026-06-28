@@ -74,6 +74,7 @@ export interface SplitLobby {
 }
 
 const activeSplitLobbies = new Map<string, SplitLobby>();
+const helpRequestRateLimit = new Map<string, number>();
 
 /**
  * Calculates high-precision aggregated cart state for a table session.
@@ -81,6 +82,7 @@ const activeSplitLobbies = new Map<string, SplitLobby>();
 async function getAggregatedCart(sessionId: string) {
   const pendingOrder = await prisma.order.findFirst({
     where: { sessionId, status: 'PENDING' },
+    orderBy: { createdAt: 'asc' },
     include: {
       items: {
         include: {
@@ -360,7 +362,8 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
 
           // Fetch or initialize cart (PENDING order)
           let order = await tx.order.findFirst({
-            where: { sessionId, status: 'PENDING' }
+            where: { sessionId, status: 'PENDING' },
+            orderBy: { createdAt: 'asc' }
           });
           if (!order) {
             order = await tx.order.create({
@@ -483,6 +486,7 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
         const order = await prisma.$transaction(async (tx) => {
           const pendingOrder = await tx.order.findFirst({
             where: { sessionId, status: 'PENDING' },
+            orderBy: { createdAt: 'asc' },
             include: {
               items: {
                 include: {
@@ -594,6 +598,13 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
     });
 
     socket.on('requestHelp', ({ tableId, requestType }) => {
+      const now = Date.now();
+      const lastRequest = helpRequestRateLimit.get(tableId) || 0;
+      if (now - lastRequest < 30000) {
+        return; // Rate limit: 1 request per 30 seconds per table
+      }
+      helpRequestRateLimit.set(tableId, now);
+
       fastify.log.info(`Help request: table ${tableId} needs ${requestType}`);
       io?.emit('helpRequested', { tableNumber: tableId, requestType });
     });

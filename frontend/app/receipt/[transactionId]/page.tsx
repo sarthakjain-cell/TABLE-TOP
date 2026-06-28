@@ -17,17 +17,8 @@ export default function ReceiptPage({ params }: { params: { transactionId: strin
       .then(res => res.json())
       .then(data => {
         if (data.error) setError(data.error);
-        else {
           setTransaction(data);
-          if (data.customerPhone) {
-            setWaPhone(data.customerPhone);
-            if (typeof window !== 'undefined' && window.location.search.includes('admin=true')) {
-              setIsVerified(true);
-            }
-          } else {
-            setIsVerified(true); // If no phone is attached, skip verification
-          }
-        }
+          setIsVerified(true); // Auto-verify, UUID is secure and PII is masked
       })
       .catch(err => setError('Failed to load receipt'));
   }, [params.transactionId]);
