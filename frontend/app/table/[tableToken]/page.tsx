@@ -104,7 +104,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   }, [tableSession?.cart?.items]);
 
 
-  const renderItemCard = (item: MenuItem, isHorizontal: boolean = false) => (
+  const renderItemCard = (item: MenuItem, isHorizontal: boolean = false, addedVia?: string) => (
     <div
       key={item.id}
       className={`bg-white/85 backdrop-blur-lg rounded-3xl p-4 shadow-soft border border-white flex justify-between items-start gap-3 h-full ${isHorizontal ? 'w-[300px] shrink-0 snap-start' : 'w-full'}`}
@@ -139,15 +139,15 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
             {item.isAvailable ? (
               item.hasHalfPortion ? (
                 <div className="flex gap-2">
-                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD FULL</motion.button>
-                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD HALF</motion.button>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false, addedVia); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD FULL</motion.button>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true, addedVia); }} className="bg-white text-gray-700 border border-gray-200 font-bold text-xs px-4 py-2 rounded-xl uppercase btn-tactile">ADD HALF</motion.button>
                   {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                     <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-brand-primary font-bold text-[10px] uppercase ml-1 flex flex-col items-center justify-center btn-tactile"><span>⚙️</span><span>Modify</span></button>
                   )}
                 </div>
               ) : (
                 <div className="flex flex-col items-start">
-                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile">ADD</motion.button>
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false, addedVia); }} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 font-bold text-sm px-8 py-2.5 rounded-xl uppercase btn-tactile">ADD</motion.button>
                   {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                     <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-gray-400 text-[10px] mt-1 font-semibold text-center w-[75px]">Customizable</button>
                   )}
@@ -169,12 +169,12 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
           {item.isAvailable ? (
             item.hasHalfPortion ? (
               <div className="absolute -bottom-3 flex gap-1 justify-center w-full px-2">
-                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">FULL</motion.button>
-                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true); }} className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">HALF</motion.button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false, addedVia); }} className="bg-white text-brand-primary shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">FULL</motion.button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, true, addedVia); }} className="bg-white text-gray-700 shadow-float font-extrabold text-[10px] px-2 py-2 rounded-xl uppercase btn-tactile border border-gray-100 flex-1 text-center">HALF</motion.button>
               </div>
             ) : (
               <div className="absolute -bottom-4 w-full flex flex-col items-center">
-                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false); }} className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100">ADD</motion.button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleItemAddClick(item, false, addedVia); }} className="w-[85%] bg-white text-brand-primary shadow-float font-extrabold text-sm px-4 py-2.5 rounded-xl uppercase btn-tactile border border-gray-100">ADD</motion.button>
                 {((() => { try { const g = typeof item.modifierGroups === "string" ? JSON.parse(item.modifierGroups) : item.modifierGroups; return Array.isArray(g) && g.length > 0; } catch { return false; } })()) && (
                   <button onClick={(e) => { e.stopPropagation(); setItemBeingCustomized(item); }} className="text-gray-400 text-[9px] mt-1 font-semibold text-center z-10 bg-white/90 px-1.5 py-0.5 rounded-sm backdrop-blur-sm">Customizable</button>
                 )}
@@ -855,7 +855,7 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     <span className="text-brand-primary text-2xl animate-pulse">✨</span> Recommended For You
                   </h2>
                   <div className="flex gap-4 overflow-x-auto no-scrollbar px-3 pb-4 snap-x">
-                    {recommendedItems.map(item => renderItemCard(item, true))}
+                    {recommendedItems.map(item => renderItemCard(item, true, 'ML_WIDGET'))}
                   </div>
                 </div>
               )}

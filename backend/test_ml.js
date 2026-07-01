@@ -1,0 +1,1 @@
+﻿const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); prisma.orderItem.findMany({ where: { addedVia: 'ML_WIDGET' }, include: { order: true } }).then(items => { console.log('Found', items.length); items.forEach(i => console.log(i.order.status, i.createdAt)); }).finally(() => prisma.\$disconnect());

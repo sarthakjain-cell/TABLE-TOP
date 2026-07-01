@@ -259,7 +259,7 @@ export const restaurantRoutes: FastifyPluginAsync = async (fastify: FastifyInsta
       
       const ordersWithMLItems = await prisma.orderItem.findMany({
         where: {
-          addedVia: 'ML_WIDGET',
+          addedVia: { in: ['ML_WIDGET', 'CART_TAB'] },
           createdAt: {
             gte: firstDayOfMonth
           },
