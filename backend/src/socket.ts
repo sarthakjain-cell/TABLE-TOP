@@ -60,16 +60,18 @@ export interface SocketData {
 
 let io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | null = null;
 
-export interface SplitPortion {
-  id: string;
+export interface SplitContributor {
+  id: string; // client generated id
   name: string;
   amount: number;
-  status: 'PENDING' | 'CLAIMED' | 'PAID';
+  status: 'JOINED' | 'READY' | 'PAID' | 'FAILED';
 }
 
 export interface SplitLobby {
   sessionId: string;
-  splits: SplitPortion[];
+  totalBill: number;
+  contributors: SplitContributor[];
+  isLocked: boolean;
   isComplete: boolean;
 }
 
@@ -613,18 +615,15 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
     // MULTIPLAYER SPLIT PAYMENT LOBBY EVENTS
     // ----------------------------------------------------
 
-    socket.on('initiateSplitPayment', (data) => {
+    socket.on('createSplitLobby', (data) => {
       const sessionId = socket.data.sessionId;
       if (!sessionId) return;
       
-      const splits: SplitPortion[] = data.splits.map((s: any) => ({
-        ...s,
-        status: 'PENDING'
-      }));
-
       const lobby: SplitLobby = {
         sessionId,
-        splits,
+        totalBill: data.totalBill || 0,
+        contributors: [],
+        isLocked: false,
         isComplete: false
       };
 
@@ -632,50 +631,106 @@ export function initSocketIO(server: HttpServer, fastify: FastifyInstance) {
       io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
     });
 
-    socket.on('claimSplitPayment', (data) => {
+    socket.on('joinSplitLobby', (data) => {
       const sessionId = socket.data.sessionId;
       if (!sessionId) return;
-
+      
       const lobby = activeSplitLobbies.get(sessionId);
-      if (!lobby) return;
+      if (!lobby || lobby.isLocked) return;
 
-      const split = lobby.splits.find((s: SplitPortion) => s.id === data.splitId);
-      if (split && split.status === 'PENDING') {
-        split.status = 'CLAIMED';
+      if (!lobby.contributors.find(c => c.id === data.id)) {
+        lobby.contributors.push({
+          id: data.id,
+          name: data.name,
+          amount: 0,
+          status: 'JOINED'
+        });
         io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
       }
     });
 
-    socket.on('unclaimSplitPayment', (data) => {
+    socket.on('updateSplitAmount', (data) => {
       const sessionId = socket.data.sessionId;
       if (!sessionId) return;
-
+      
       const lobby = activeSplitLobbies.get(sessionId);
-      if (!lobby) return;
+      if (!lobby || lobby.isLocked) return;
 
-      const split = lobby.splits.find((s: SplitPortion) => s.id === data.splitId);
-      if (split && split.status === 'CLAIMED') {
-        split.status = 'PENDING';
+      const contributor = lobby.contributors.find(c => c.id === data.id);
+      if (contributor && contributor.status === 'JOINED') {
+        contributor.amount = data.amount;
         io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
       }
     });
 
-    socket.on('confirmSplitPayment', (data) => {
+    socket.on('markSplitReady', (data) => {
       const sessionId = socket.data.sessionId;
       if (!sessionId) return;
-
+      
       const lobby = activeSplitLobbies.get(sessionId);
       if (!lobby) return;
 
-      const split = lobby.splits.find((s: SplitPortion) => s.id === data.splitId);
-      if (split) {
-        split.status = 'PAID';
-        lobby.isComplete = lobby.splits.every((s: SplitPortion) => s.status === 'PAID');
+      const contributor = lobby.contributors.find(c => c.id === data.id);
+      if (contributor) {
+        contributor.status = data.isReady ? 'READY' : 'JOINED';
         
-        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+        // If everyone is READY and sum == totalBill, lock the lobby
+        const allReady = lobby.contributors.length > 0 && lobby.contributors.every(c => c.status === 'READY');
+        const sum = lobby.contributors.reduce((acc, c) => acc + c.amount, 0);
+        
+        // Use a small tolerance for floating point math
+        if (allReady && Math.abs(sum - lobby.totalBill) < 0.05) {
+          lobby.isLocked = true;
+        } else {
+          lobby.isLocked = false;
+        }
 
-        // The frontend will listen for lobby.isComplete and trigger executeCheckout('CASH' -> modified for Split) 
-        // to move the order to PAYMENT_PENDING.
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+      }
+    });
+
+    socket.on('markSplitPaid', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+      
+      const lobby = activeSplitLobbies.get(sessionId);
+      if (!lobby) return;
+
+      const contributor = lobby.contributors.find(c => c.id === data.id);
+      if (contributor) {
+        contributor.status = 'PAID';
+        lobby.isComplete = lobby.contributors.every(c => c.status === 'PAID');
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+      }
+    });
+
+    socket.on('markSplitFailed', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+      
+      const lobby = activeSplitLobbies.get(sessionId);
+      if (!lobby) return;
+
+      const contributor = lobby.contributors.find(c => c.id === data.id);
+      if (contributor && contributor.status !== 'PAID') {
+        contributor.status = 'FAILED';
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
+      }
+    });
+
+    socket.on('leaveSplitLobby', (data) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId) return;
+      
+      const lobby = activeSplitLobbies.get(sessionId);
+      if (!lobby || lobby.isLocked) return;
+
+      lobby.contributors = lobby.contributors.filter(c => c.id !== data.id);
+      if (lobby.contributors.length === 0) {
+        activeSplitLobbies.delete(sessionId);
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby: null });
+      } else {
+        io?.to(`session:${sessionId}`).emit('splitPaymentSync', { lobby });
       }
     });
 

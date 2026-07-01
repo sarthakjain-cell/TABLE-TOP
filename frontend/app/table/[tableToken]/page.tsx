@@ -5,7 +5,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { decimalMath } from '../../../utils/decimalMath';
 import nextDynamic from 'next/dynamic';
 import Script from 'next/script';
-import { CheckCircle, Users, Menu, X, ChevronDown } from 'lucide-react';
+import { CheckCircle, Users, Menu, X, ChevronDown, XCircle, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -353,32 +353,44 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
   const [showUpiOptions, setShowUpiOptions] = useState(false);
 
   // Multiplayer Split State
-  interface SplitPortion {
-    id: string;
+  interface SplitContributor {
+    id: string; // generated locally per client
     name: string;
     amount: number;
-    status: 'PENDING' | 'CLAIMED' | 'PAID';
+    status: 'JOINED' | 'READY' | 'PAID' | 'FAILED';
   }
 
   interface SplitLobby {
     sessionId: string;
-    splits: SplitPortion[];
+    totalBill: number;
+    contributors: SplitContributor[];
+    isLocked: boolean;
     isComplete: boolean;
   }
 
   const [splitLobby, setSplitLobby] = useState<SplitLobby | null>(null);
-  const [localClaimedSplitId, setLocalClaimedSplitId] = useState<string | null>(null);
+  const [localContributorId, setLocalContributorId] = useState<string | null>(null);
+  
+  // Generate a unique ID for this client's browser session to track their split
+  useEffect(() => {
+    let clientId = localStorage.getItem('tabletop_client_id');
+    if (!clientId) {
+      clientId = Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('tabletop_client_id', clientId);
+    }
+    setLocalContributorId(clientId);
+  }, []);
+
   useEffect(() => {
     const handlePopState = () => {
-      if (localClaimedSplitId) {
-        socket?.emit('unclaimSplitPayment', { splitId: localClaimedSplitId });
-        setLocalClaimedSplitId(null);
+      if (localContributorId) {
+        socket?.emit('leaveSplitLobby', { id: localContributorId });
         setPaymentProcessing(false);
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [localClaimedSplitId, socket]);
+  }, [localContributorId, socket]);
 
 
   // 1. Verify token & join table room on mount (Parallelized for Speed)
@@ -677,7 +689,6 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
     if (splitLobby?.isComplete) {
       executeCheckout('UPI');
       setSplitLobby(null);
-      setLocalClaimedSplitId(null);
     }
   }, [splitLobby?.isComplete]);
 
@@ -1365,8 +1376,13 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                     {tableSession?.paymentMode !== 'PRE_PAY' && (
                       <button
                         onClick={() => {
-                          setContributors([{ id: Date.now(), name: "Payer 1", amount: "" }]);
-                          setCheckoutMode('SPLIT');
+                          if (!customerName || customerPhone.length !== 10) {
+                            alert("Please enter a valid 10-digit phone number and your name before splitting the bill.");
+                            return;
+                          }
+                          socket?.emit('createSplitLobby', { totalBill: grandTotal });
+                          socket?.emit('joinSplitLobby', { id: localContributorId, name: customerName });
+                          setCheckoutMode('CHOICE');
                         }}
                         className="w-full h-20 border-2 border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform rounded-2xl flex flex-col items-center justify-center text-gray-800"
                       >
@@ -1705,38 +1721,110 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
         {splitLobby && !splitLobby.isComplete && (
           <div className="fixed inset-0 bg-slate-900/80 z-[60] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in">
             <div className="bg-white w-full max-w-2xl mx-auto rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                            {localClaimedSplitId ? (() => {
-                const mySplit = splitLobby.splits.find(s => s.id === localClaimedSplitId);
-                if (!mySplit) return null;
-                
+              <h3 className="text-2xl font-black text-gray-800 text-center mb-4">Collaborative Split</h3>
+              
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center mb-6">
+                <p className="text-indigo-800 font-bold mb-1 uppercase tracking-widest text-xs">Total Bill</p>
+                <p className="text-3xl font-black text-indigo-600 tabular-nums">${splitLobby.totalBill.toFixed(2)}</p>
+                <div className="mt-2 text-sm font-bold">
+                  {(() => {
+                    const sum = splitLobby.contributors.reduce((acc, c) => acc + c.amount, 0);
+                    const diff = splitLobby.totalBill - sum;
+                    if (Math.abs(diff) < 0.05) return <span className="text-emerald-600">✅ Sum matches bill!</span>;
+                    if (diff > 0) return <span className="text-amber-600">⚠️ ${diff.toFixed(2)} remaining</span>;
+                    return <span className="text-red-600">⚠️ Over by ${Math.abs(diff).toFixed(2)}</span>;
+                  })()}
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                {splitLobby.contributors.map(c => {
+                  const isMe = c.id === localContributorId;
+                  return (
+                    <div key={c.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
+                      c.status === 'PAID' ? 'bg-emerald-50 border-emerald-200' :
+                      c.status === 'FAILED' ? 'bg-red-50 border-red-200' :
+                      c.status === 'READY' ? 'bg-indigo-50 border-indigo-200' :
+                      'bg-white border-gray-200'
+                    }`}>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800 flex items-center gap-2">
+                          {c.name} {isMe && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">YOU</span>}
+                        </p>
+                        {isMe && !splitLobby.isLocked ? (
+                          <div className="relative mt-2">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                            <input
+                              type="number"
+                              value={c.amount || ''}
+                              onChange={(e) => {
+                                socket?.emit('updateSplitAmount', { id: localContributorId, amount: parseFloat(e.target.value) || 0 });
+                              }}
+                              className="w-full pl-7 pr-3 py-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-lg font-black text-gray-700 mt-1">${c.amount.toFixed(2)}</p>
+                        )}
+                      </div>
+                      
+                      <div className="ml-4 flex flex-col items-end">
+                        {c.status === 'PAID' && <span className="text-emerald-600 font-black flex items-center gap-1"><CheckCircle size={18}/> PAID</span>}
+                        {c.status === 'FAILED' && <span className="text-red-600 font-bold text-sm flex flex-col items-end"><XCircle size={18}/> Failed</span>}
+                        
+                        {isMe && !splitLobby.isLocked && (
+                          <button
+                            onClick={() => socket?.emit('markSplitReady', { id: localContributorId, isReady: c.status !== 'READY' })}
+                            className={`px-4 py-2 mt-2 rounded-xl font-bold text-sm transition-all ${
+                              c.status === 'READY' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {c.status === 'READY' ? 'Ready!' : 'Mark Ready'}
+                          </button>
+                        )}
+                        {!isMe && !splitLobby.isLocked && c.status === 'READY' && (
+                          <span className="text-indigo-600 font-bold text-sm mt-2 flex items-center gap-1"><Check size={16}/> Ready</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {splitLobby.isLocked && (() => {
+                const myContributor = splitLobby.contributors.find(c => c.id === localContributorId);
+                if (!myContributor || myContributor.status === 'PAID') {
+                  return (
+                    <div className="text-center p-4 bg-gray-50 rounded-2xl">
+                      <p className="font-bold text-gray-600">Waiting for others to finish paying...</p>
+                    </div>
+                  );
+                }
+
                 const handleRazorpaySplit = async () => {
                   if (!tableSession?.sessionId) return;
                   setPaymentProcessing(true);
-                  console.log("Starting Razorpay custom split for amount:", mySplit.amount);
                   try {
                     const response = await fetch(`/api/sessions/${tableSession.sessionId}/pay-custom-amount`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        customerName: customerName || mySplit.name,
+                        customerName: myContributor.name,
                         customerPhone: customerPhone || '9999999999',
-                        amountToPay: mySplit.amount
+                        amountToPay: myContributor.amount
                       })
                     });
                     
-                    if (!response.ok) {
-                      const errData = await response.json();
-                      throw new Error(errData.error || 'Payment failed');
-                    }
-                    
+                    if (!response.ok) throw new Error('Payment failed');
                     const resData = await response.json();
                     
                     const options = {
-                      key: 'rzp_live_Szz1d4E7cQBqbS', // Hardcoded to bypass Vercel env cache
+                      key: 'rzp_live_Szz1d4E7cQBqbS', // Hardcoded to bypass cache
                       amount: resData.amount,
                       currency: "INR",
                       name: restaurant?.name || "Table Top",
-                      description: `Split Payment for ${mySplit.name}`,
+                      description: `Split Payment for ${myContributor.name}`,
                       order_id: resData.razorpayOrderId,
                       handler: async function (razorpayResponse: any) {
                         try {
@@ -1744,118 +1832,70 @@ export default function CustomerPage({ params }: { params: { tableToken: string 
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                              razorpay_order_id: razorpayResponse.razorpay_order_id,
-                              razorpay_payment_id: razorpayResponse.razorpay_payment_id,
-                              razorpay_signature: razorpayResponse.razorpay_signature
+                               razorpay_order_id: razorpayResponse.razorpay_order_id,
+                               razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                               razorpay_signature: razorpayResponse.razorpay_signature
                             })
                           });
                           
-                          if (!verifyRes.ok) {
-                            const errData = await verifyRes.json();
-                            throw new Error(errData.error || 'Payment verification failed');
-                          }
+                          if (!verifyRes.ok) throw new Error('Payment verification failed');
                           
-                          socket?.emit('confirmSplitPayment', { splitId: mySplit.id });
+                          socket?.emit('markSplitPaid', { id: myContributor.id });
                         } catch (err: any) {
-                          toast.error("Payment successful but verification failed: " + err.message);
+                          socket?.emit('markSplitFailed', { id: myContributor.id });
+                          alert("Verification failed: " + err.message);
                         } finally {
-                          setLocalClaimedSplitId(null);
                           setPaymentProcessing(false);
                         }
                       },
-                      prefill: {
-                        name: customerName || mySplit.name,
-                        contact: customerPhone || ''
-                      },
-                      theme: {
-                        color: "#4f46e5"
-                      },
+                      theme: { color: "#4f46e5" },
                       modal: {
                         ondismiss: function() {
                           setPaymentProcessing(false);
-                          socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
-                          setLocalClaimedSplitId(null);
+                          socket?.emit('markSplitFailed', { id: myContributor.id });
                         }
                       }
                     };
                     
                     const rzp = new (window as any).Razorpay(options);
                     rzp.on('payment.failed', function (response: any) {
-                      alert(response.error.description || 'Payment failed');
                       setPaymentProcessing(false);
-                      socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
-                      setLocalClaimedSplitId(null);
+                      socket?.emit('markSplitFailed', { id: myContributor.id });
+                      alert(response.error.description || 'Payment failed');
                     });
                     rzp.open();
                   } catch (error: any) {
-                    alert(error.message);
                     setPaymentProcessing(false);
-                    socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
-                    setLocalClaimedSplitId(null);
+                    socket?.emit('markSplitFailed', { id: myContributor.id });
+                    alert(error.message);
                   }
                 };
-                
+
                 return (
-                  <div className="text-center space-y-6">
-                    <h3 className="text-2xl font-black text-gray-800">Pay Your Share</h3>
-                    <p className="text-gray-500 font-medium">Paying ${mySplit.amount.toFixed(2)} for {mySplit.name}</p>
-                    
+                  <div className="space-y-4">
+                    {myContributor.status === 'FAILED' && (
+                       <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
+                         <p className="text-red-600 font-bold text-sm">Previous payment failed. Please try again.</p>
+                       </div>
+                    )}
                     <button 
                       onClick={handleRazorpaySplit}
                       disabled={paymentProcessing}
-                      className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform disabled:opacity-50"
                     >
-                      {paymentProcessing ? 'Processing...' : 'Pay via Razorpay'}
-                    </button>
-                    
-                    <button 
-                      onClick={() => {
-                        socket?.emit('unclaimSplitPayment', { splitId: mySplit.id });
-                        setLocalClaimedSplitId(null);
-                        window.history.back();
-                      }}
-                      disabled={paymentProcessing}
-                      className="w-full text-gray-500 hover:text-gray-700 font-bold py-2 text-sm uppercase tracking-widest"
-                    >
-                      Cancel
+                      {paymentProcessing ? 'Processing...' : `Pay My Share ($${myContributor.amount.toFixed(2)})`}
                     </button>
                   </div>
                 );
-              })() : (
+              })()}
 
-                <div className="space-y-6">
-                   <h3 className="text-2xl font-black text-gray-800 text-center mb-4">Multiplayer Split</h3>
-                   <div className="space-y-3">
-                     {splitLobby.splits.map(split => (
-                       <div key={split.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
-                         split.status === 'PAID' ? 'bg-emerald-50 border-emerald-200' :
-                         split.status === 'CLAIMED' ? 'bg-amber-50 border-amber-200 opacity-50' :
-                         'bg-white border-gray-200 hover:border-indigo-400'
-                       }`}>
-                         <div>
-                           <p className="font-bold text-gray-800">{split.name}</p>
-                           <p className="text-sm font-bold text-gray-500">${split.amount.toFixed(2)}</p>
-                         </div>
-                         <div>
-                           {split.status === 'PAID' && <span className="text-emerald-600 font-black flex items-center gap-1"><CheckCircle size={18}/> PAID</span>}
-                           {split.status === 'CLAIMED' && <span className="text-amber-600 font-bold text-sm">Paying...</span>}
-                           {split.status === 'PENDING' && (
-                             <button 
-                               onClick={() => {
-                                 window.history.pushState({ splitScreen: true }, '');
-                                 setLocalClaimedSplitId(split.id);
-                                 socket?.emit('claimSplitPayment', { splitId: split.id });
-                               }}
-                               className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform"
-                             >
-                               Pay This
-                             </button>
-                           )}
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                </div>
+              {!splitLobby.isLocked && (
+                <button 
+                  onClick={() => socket?.emit('leaveSplitLobby', { id: localContributorId })}
+                  className="w-full text-gray-500 hover:text-red-500 font-bold py-3 text-sm uppercase tracking-widest mt-2 transition-colors"
+                >
+                  Leave Lobby
+                </button>
               )}
             </div>
           </div>
